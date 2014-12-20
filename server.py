@@ -26,14 +26,19 @@ while True:
     connection, client_address = sock.accept()
     try:
         print >>sys.stderr, 'connection from', client_address
+        cap = cv2.VideoCapture("/home/flo/outvid2.avi")
 
         # Receive the data in small chunks and retransmit it
         while True:
             data = connection.recv(16)
             print >>sys.stderr, 'received "%s"' % data
             if data:
-                print >>sys.stderr, 'sending data back to the client'
-                connection.sendall(data)
+                if data=="get\n":
+                    status, frame = cap.read()
+                    print >>sys.stderr, 'sending image to the client'
+                    connection.sendall(frame.tostring())
+                    cv2.imshow("img",frame)
+                    cv2.waitKey(20)
             else:
                 print >>sys.stderr, 'no more data from', client_address
                 break
@@ -42,7 +47,6 @@ while True:
         # Clean up the connection
         connection.close()
 
-cap = cv2.VideoCapture("/home/flo/outvid2.avi")
 while True:
     status, frame = cap.read()
     cv2.imshow("img",frame)
