@@ -3,6 +3,12 @@ import os
 import socket
 import sys
 
+def encode_int(i):
+    i = int(i)
+    return chr( (i/(2**24))%256) + chr( (i/(2**16))%256 ) +\
+            chr( (i/(2**8))%256) + chr(i%256)
+
+
 server_address = '/home/flo/uds_socket'
 try:
     os.unlink(server_address)
@@ -35,8 +41,13 @@ while True:
             if data:
                 if data=="get\n":
                     status, frame = cap.read()
-                    print >>sys.stderr, 'sending image to the client'
-                    connection.sendall(frame.tostring())
+                    framestr = frame.tostring()
+                    lenframestr=len(framestr)
+                    print hex(lenframestr)
+                    for i in xrange(0,4):
+                        print hex(ord(encode_int(lenframestr)[i]))
+                    print 'sending ',lenframestr,' bytes to the client'
+                    connection.sendall(encode_int(lenframestr)+framestr);
                     cv2.imshow("img",frame)
                     cv2.waitKey(20)
             else:
