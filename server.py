@@ -42,6 +42,8 @@ while True:
             else:
                 print >>sys.stderr, 'no more data from', client_address
                 break
+    except:
+        print "Dingens!!11!1!!!"
             
     finally:
         # Clean up the connection
