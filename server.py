@@ -37,19 +37,14 @@ while True:
         # Receive the data in small chunks and retransmit it
         while True:
             data = connection.recv(16)
-            print >>sys.stderr, 'received "%s"' % data
             if data:
                 if data=="get\n":
                     status, frame = cap.read()
                     framestr = frame.tostring()
                     lenframestr=len(framestr)
-                    print hex(lenframestr)
-                    for i in xrange(0,4):
-                        print hex(ord(encode_int(lenframestr)[i]))
-                    print 'sending ',lenframestr,' bytes to the client'
                     connection.sendall(encode_int(lenframestr)+framestr);
-                    cv2.imshow("img",frame)
-                    cv2.waitKey(20)
+                    #cv2.imshow("img",frame)
+                    #cv2.waitKey(1)
             else:
                 print >>sys.stderr, 'no more data from', client_address
                 break
