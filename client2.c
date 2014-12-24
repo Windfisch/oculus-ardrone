@@ -61,19 +61,22 @@ int main(int argc, const char** argv)
 	#define N_VALUES 8
 	int curr_val=0;
 	float val[N_VALUES];
-	float step[N_VALUES] = {0.05,0.05,0.05,0.05,10,10,10,10};
+	float step[N_VALUES] = {0.05,0.05,0.0,0.0,10,10,10,10};
 	Mat map1[3], map2[3];
 	
 	float &k1=val[0], &k2=val[1], &p1=val[2], &p2=val[3];
-	float &c1=val[4], &c2=val[5], &c1_=val[6], &c2_=val[7];
+	float &x1=val[4], &y1=val[5], &x2=val[6], &y2=val[7];
+	float c1,c2,c1_,c2_;
+
 	k1=0.5;
 	k2=0.1;
 	p1=0.0;
 	p2=0.0;
-	c1=800;
-	c2=300;
+	c1=1280/2;
+	c2=768/2;
 	c1_=960/2;
 	c2_=1080/2;
+	x1=x2=y1=y2=0.0;
 
 	while ((key = waitKey(1)) != 'x')
 	{
@@ -91,15 +94,15 @@ int main(int argc, const char** argv)
 			Mat camera_matrix = Mat::eye(3,3,CV_32FC1);
 			camera_matrix.at<float>(0,0)=1000;
 			camera_matrix.at<float>(1,1)=1000;
-			camera_matrix.at<float>(0,2)=c1;
-			camera_matrix.at<float>(1,2)=c2;
+			camera_matrix.at<float>(0,2)=c1+x1+x2;
+			camera_matrix.at<float>(1,2)=c2+y1+y2;
 			for  (int i=0; i<3; i++)
 			{
 				Mat camera_matrix_clone = camera_matrix.clone();
 				camera_matrix_clone.at<float>(0,0)*=(1.+(i-1)/100.);
 				camera_matrix_clone.at<float>(1,1)*=(1.+(i-1)/100.);
-				camera_matrix_clone.at<float>(0,2)=c1_;
-				camera_matrix_clone.at<float>(1,2)=c2_;
+				camera_matrix_clone.at<float>(0,2)=c1_+x1;
+				camera_matrix_clone.at<float>(1,2)=c2_+y1;
 				initUndistortRectifyMap(camera_matrix, Vec4f(k1,k2,p1,p2), Mat::eye(3,3,CV_32F), camera_matrix_clone, Size(960,1080), CV_32FC1, map1[i], map2[i]);
 			}
 
@@ -115,10 +118,10 @@ int main(int argc, const char** argv)
 		}
 
 		//Mat dingens=Mat::eye(100,100,CV_8UC1) * 244;
-		Mat dingens(600,1600,CV_8UC3, buffer);
-		for (int i=0; i< 1600; i+=50)
+		Mat dingens(768,1280,CV_8UC3, buffer);
+		for (int i=0; i< 1280; i+=50)
 			dingens.col(i)=Vec3b(255,192,128);
-		for (int i=0; i< 600; i+=50)
+		for (int i=0; i< 768; i+=50)
 			dingens.row(i)=Vec3b(255,192,128);
 		Mat zeuch, zeuch2;
 		//remap(dingens, zeuch, map1, map2, INTER_LINEAR);

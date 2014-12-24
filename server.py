@@ -32,7 +32,7 @@ while True:
     connection, client_address = sock.accept()
     try:
         print >>sys.stderr, 'connection from', client_address
-        cap = cv2.VideoCapture("/home/flo/outvid2.avi")
+        cap = cv2.VideoCapture("/home/flo/kruschkram/out2.avi")
 
         # Receive the data in small chunks and retransmit it
         while True:
