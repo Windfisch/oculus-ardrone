@@ -45,19 +45,6 @@ int main(int argc, const char** argv)
 	if (connect(sockfd, (struct sockaddr*) &my_sockaddr, sockaddrlen) == -1)
 		die("connect");
 
-	Mat camera_matrix = Mat::eye(3,3,CV_32FC1);
-	camera_matrix.at<float>(0,0)=1000;
-	camera_matrix.at<float>(1,1)=1000;
-	camera_matrix.at<float>(0,2)=800;
-	camera_matrix.at<float>(1,2)=300;
-	Mat map1[3], map2[3];
-	for  (int i=0; i<3; i++)
-	{
-		Mat camera_matrix_clone = camera_matrix.clone();
-		camera_matrix_clone.at<float>(0,0)*=(1.+i/100.);
-		camera_matrix_clone.at<float>(1,1)*=(1.+i/100.);
-		initUndistortRectifyMap(camera_matrix, Vec4f(0.5,0.1,0,0), Mat::eye(3,3,CV_32F), camera_matrix_clone, Size(1600,600), CV_32FC1, map1[i], map2[i]);
-	}
 	printf("GO!!\n");
 	time_t t = time(NULL);
 	int nframes=0;
@@ -67,13 +54,65 @@ int main(int argc, const char** argv)
 	int framelen = ((buffer[0]*256+buffer[1])*256+buffer[2])*256+buffer[3];
 	if (framelen > sizeof(buffer)) suicide("buffer too small");
 	read_completely(sockfd, buffer, framelen);
-	while (waitKey(1) != 'x')
+	char key;
+	bool go=true;
+	bool new_vals=true;
+	
+	#define N_VALUES 8
+	int curr_val=0;
+	float val[N_VALUES];
+	float step[N_VALUES] = {0.05,0.05,0.05,0.05,10,10,10,10};
+	Mat map1[3], map2[3];
+	
+	float &k1=val[0], &k2=val[1], &p1=val[2], &p2=val[3];
+	float &c1=val[4], &c2=val[5], &c1_=val[6], &c2_=val[7];
+	k1=0.5;
+	k2=0.1;
+	p1=0.0;
+	p2=0.0;
+	c1=800;
+	c2=300;
+	c1_=960/2;
+	c2_=1080/2;
+
+	while ((key = waitKey(1)) != 'x')
 	{
-		write(sockfd,"get\n",4);
-		read_completely(sockfd, buffer, 4);
-		int framelen = ((buffer[0]*256+buffer[1])*256+buffer[2])*256+buffer[3];
-		if (framelen > sizeof(buffer)) suicide("buffer too small");
-		read_completely(sockfd, buffer, framelen);
+		switch (key)
+		{
+			case 'g': go=!go; break;
+			case 'w': val[curr_val]+=step[curr_val]; new_vals=true; break;
+			case 's': val[curr_val]-=step[curr_val]; new_vals=true; break;
+			case 'a': curr_val = (curr_val-1+N_VALUES) % N_VALUES; break;
+			case 'd': curr_val = (curr_val+1) % N_VALUES; break;
+		}
+
+		if (new_vals)
+		{
+			Mat camera_matrix = Mat::eye(3,3,CV_32FC1);
+			camera_matrix.at<float>(0,0)=1000;
+			camera_matrix.at<float>(1,1)=1000;
+			camera_matrix.at<float>(0,2)=c1;
+			camera_matrix.at<float>(1,2)=c2;
+			for  (int i=0; i<3; i++)
+			{
+				Mat camera_matrix_clone = camera_matrix.clone();
+				camera_matrix_clone.at<float>(0,0)*=(1.+(i-1)/100.);
+				camera_matrix_clone.at<float>(1,1)*=(1.+(i-1)/100.);
+				camera_matrix_clone.at<float>(0,2)=c1_;
+				camera_matrix_clone.at<float>(1,2)=c2_;
+				initUndistortRectifyMap(camera_matrix, Vec4f(k1,k2,p1,p2), Mat::eye(3,3,CV_32F), camera_matrix_clone, Size(960,1080), CV_32FC1, map1[i], map2[i]);
+			}
+
+			new_vals=false;
+		}
+
+		if (go) {
+			write(sockfd,"get\n",4);
+			read_completely(sockfd, buffer, 4);
+			int framelen = ((buffer[0]*256+buffer[1])*256+buffer[2])*256+buffer[3];
+			if (framelen > sizeof(buffer)) suicide("buffer too small");
+			read_completely(sockfd, buffer, framelen);
+		}
 
 		//Mat dingens=Mat::eye(100,100,CV_8UC1) * 244;
 		Mat dingens(600,1600,CV_8UC3, buffer);
@@ -81,7 +120,7 @@ int main(int argc, const char** argv)
 			dingens.col(i)=Vec3b(255,192,128);
 		for (int i=0; i< 600; i+=50)
 			dingens.row(i)=Vec3b(255,192,128);
-		Mat zeuch;
+		Mat zeuch, zeuch2;
 		//remap(dingens, zeuch, map1, map2, INTER_LINEAR);
 
 		Mat colors[3];
@@ -92,8 +131,9 @@ int main(int argc, const char** argv)
 			remap(colors[i], colors2[i], map1[i], map2[i], INTER_LINEAR);
 
 		merge(colors2, 3, zeuch);
+		hconcat(zeuch,zeuch,zeuch2);
 
-		imshow("dingens",zeuch);
+		imshow("dingens",zeuch2);
 
 		time_t tmp = time(NULL);
 		if (tmp!=t)
