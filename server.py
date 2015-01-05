@@ -1,3 +1,5 @@
+import libardrone.libardrone as libardrone
+import pygame
 import cv2
 import os
 import socket
@@ -61,17 +63,48 @@ sock.bind(server_address)
 sock.listen(1)
 
 
+try:
+    pygame.init()
+    pygame.joystick.init()
+    js=pygame.joystick.Joystick(0)
+    js.init()
+    js_angle_shift = 0.0
+except:
+    print "meeeeh"
+
+
+drone = libardrone.ARDrone(True, True)
+drone.reset()
+
+
 serverthread=ServerThread()
 lock=threading.Lock()
 
 cap = cv2.VideoCapture("/home/flo/kruschkram/out2.avi")
 status, frame = cap.read()
 
+
+writer = cv2.VideoWriter("flight.avi",cv2.VideoWriter_fourcc(*'MP42'),25,(1280,720),1)
+logfile = open("flight.log", "w")
+
+
+
+
 serverthread.start()
 while True:
     print "hello world :)"
-    time.sleep(1)
     lock.acquire()
-    status, frame = cap.read()
+    rawimg = drone.get_image()
+    frame = cv2.cvtColor(rawimg, cv2.COLOR_BGR2RGB)
+    phi = drone.navdata.get(0, dict()).get('phi',1337)
+    theta = drone.navdata.get(0, dict()).get('theta',1337)
+    psi = drone.navdata.get(0, dict()).get('psi',1337)
     lock.release()
+
+    cv2.imshow("frame", frame)
+    writer.write(frame)
+    logfile.write(str(phi)+"\t"+str(theta)+"\t"+str(psi)+"\n")
+    print phi,theta,psi
+
+    cv2.waitKey(50)
 
