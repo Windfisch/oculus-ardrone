@@ -17,135 +17,15 @@ int main(int argc, const char** argv)
 {
 	DroneConnection drone(SOCKETPATH);
 
-	printf("GO!!\n");
-	time_t t = time(NULL);
-	int nframes=0;
-
-	char key;
-	bool go=true;
-	bool new_vals=true;
-	
-	#define N_VALUES 11
-	int curr_val=0;
-	float val[N_VALUES] =//  { 1.300000, 0.050000, 0.000000, 0.000000, 0.000000, 0.000000, 10.000000, 0.000000, -0.004000, 0.014000, 0.026000};
-	                       { 0.500000, 0.050000, 0.000000, 0.000000, 0.000000, 0.000000, 10.000000, 0.000000, 0.006000, 0.024000, 0.026000};
-				// {.0,.0,.0,.0,.0,.0,.0,.0,.0,.0,.0};
-	float step[N_VALUES] = {0.05,0.05,0.0,0.0,10,10,10,10,0.002,0.002,0.002};
-	Mat map1A[3], map2A[3], map1B[3], map2B[3];
-	
-	float &k1=val[0], &k2=val[1], &p1=val[2], &p2=val[3];
-	float &x1=val[4], &y1=val[5], &x2=val[6], &y2=val[7];
-	float* col=&val[8];
-	float c1,c2,c1_,c2_;
-
-	//k1=0.5;
-	//k2=0.1;
-	//p1=0.0;
-	//p2=0.0;
-	c1=1280/2;
-	c2=768/2;
-	c1_=960/2;
-	c2_=1080/2;
-	//x1=x2=y1=y2=0.0;
-	//col[0]=-0.01;
-	//col[1]=0.0;
-	//col[2]=0.01;
 	
 	Mat dingens;
 
-	while ((key = waitKey(1)) != 'x')
+	while (waitKey(1) != 'x')
 	{
-		switch (key)
-		{
-			case 'g': go=!go; break;
-			case 'w': val[curr_val]+=step[curr_val]; new_vals=true; break;
-			case 's': val[curr_val]-=step[curr_val]; new_vals=true; break;
-			case 'a': curr_val = (curr_val-1+N_VALUES) % N_VALUES; break;
-			case 'd': curr_val = (curr_val+1) % N_VALUES; break;
-		}
+		navdata_t navdata;
+		drone.get(dingens, &navdata);
 
-		if (new_vals)
-		{
-			printf("val = { %f", val[0]);
-			for (int i=1; i< N_VALUES; i++)
-				printf(", %f", val[i]);
-			printf("}\n");
-
-
-			Mat camera_matrix = Mat::eye(3,3,CV_32FC1);
-			camera_matrix.at<float>(0,0)=1000;
-			camera_matrix.at<float>(1,1)=1000;
-			camera_matrix.at<float>(0,2)=c1+x1+x2;
-			camera_matrix.at<float>(1,2)=c2+y1+y2;
-			for  (int i=0; i<3; i++)
-			{
-				Mat camera_matrix_clone = camera_matrix.clone();
-				camera_matrix_clone.at<float>(0,0)*=(1.+col[i]);
-				camera_matrix_clone.at<float>(1,1)*=(1.+col[i]);
-				camera_matrix_clone.at<float>(0,2)=c1_+x1;
-				camera_matrix_clone.at<float>(1,2)=c2_+y1;
-				initUndistortRectifyMap(camera_matrix, Vec4f(k1,k2,p1,p2), Mat::eye(3,3,CV_32F), camera_matrix_clone, Size(960,1080), CV_32FC1, map1A[i], map2A[i]);
-			}
-
-			camera_matrix.at<float>(0,0)=1000;
-			camera_matrix.at<float>(1,1)=1000;
-			camera_matrix.at<float>(0,2)=c1-x1-x2;
-			camera_matrix.at<float>(1,2)=c2+y1+y2;
-			for  (int i=0; i<3; i++)
-			{
-				Mat camera_matrix_clone = camera_matrix.clone();
-				camera_matrix_clone.at<float>(0,0)*=(1.+col[i]);
-				camera_matrix_clone.at<float>(1,1)*=(1.+col[i]);
-				camera_matrix_clone.at<float>(0,2)=c1_-x1;
-				camera_matrix_clone.at<float>(1,2)=c2_+y1;
-				initUndistortRectifyMap(camera_matrix, Vec4f(k1,k2,p1,p2), Mat::eye(3,3,CV_32F), camera_matrix_clone, Size(960,1080), CV_32FC1, map1B[i], map2B[i]);
-			}
-
-			new_vals=false;
-		}
-
-		if (go) {
-			navdata_t navdata;
-			drone.get(dingens, &navdata);
-		}
-
-		for (int i=0; i< 1280; i+=50)
-			dingens.col(i)=Vec3b(255,192,128);
-		for (int i=0; i< 768; i+=50)
-			dingens.row(i)=Vec3b(255,192,128);
-		
-		
-		Mat lefteye, righteye, zeuch2;
-		//remap(dingens, zeuch, map1, map2, INTER_LINEAR);
-
-		Mat colors[3];
-		Mat colors2[3];
-
-		split(dingens, colors);
-		
-		for (int i=0; i<3; i++)
-			remap(colors[i], colors2[i], map1A[i], map2A[i], INTER_LINEAR);
-
-		merge(colors2, 3, lefteye);
-		
-		split(dingens, colors);
-		
-		for (int i=0; i<3; i++)
-			remap(colors[i], colors2[i], map1B[i], map2B[i], INTER_LINEAR);
-
-		merge(colors2, 3, righteye);
-		hconcat(lefteye, righteye ,zeuch2);
-
-		imshow("dingens",zeuch2);
-
-		time_t tmp = time(NULL);
-		if (tmp!=t)
-		{
-			printf("%i FPS\n", (int)(nframes / (tmp-t)));
-			nframes=0;
-			t=tmp;
-		}
-		nframes++;
+		imshow("dingens",dingens);
 	}
 	
 	return 0;
