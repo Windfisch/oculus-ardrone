@@ -8,6 +8,7 @@
 
 #include <opencv2/opencv.hpp>
 #include "lib.h"
+#include "ringbuf.h"
 
 #define PI 3.141593654
 
@@ -53,6 +54,15 @@ int main(int argc, const char** argv)
 
 	Mat frame, gray, oldgray;
 	Mat screencontent(real_canvas_height,real_canvas_width, CV_32FC3);
+
+	#define RINGBUF_SIZE 10
+	ModuloRingbuffer ringbuf_x(RINGBUF_SIZE, -virtual_canvas_width/2, virtual_canvas_width/2);
+	Ringbuffer ringbuf_y(RINGBUF_SIZE);
+	ModuloRingbuffer ringbuf_a(RINGBUF_SIZE, -180,180);
+	ModuloRingbuffer ringbuf_phi(RINGBUF_SIZE, -180,180);
+	ModuloRingbuffer ringbuf_psi(RINGBUF_SIZE, -180,180);
+	ModuloRingbuffer ringbuf_theta(RINGBUF_SIZE, -180,180);
+
 
 	for (int i=0; i<160;i++)
 	{
@@ -109,6 +119,26 @@ int main(int argc, const char** argv)
 		imshow("screencontent", screencontent);
 
 		oldgray = gray.clone();
+
+
+		ringbuf_x.put(total_x);
+		ringbuf_y.put(total_y);
+		ringbuf_a.put(total_rot);
+		ringbuf_phi.put(navdata.phi);
+		ringbuf_psi.put(navdata.psi);
+		ringbuf_theta.put(navdata.theta);
+
+		double xdiff = fixup_range( ringbuf_x.get() - px_per_deg*ringbuf_psi.get(), -virtual_canvas_width/2, virtual_canvas_width/2);
+		double ydiff = ringbuf_y.get() + px_per_deg*ringbuf_theta.get();
+		double adiff = fixup_angle(ringbuf_a.get() - (-ringbuf_phi.get()));
+
+		total_x = fixup_range(total_x - xdiff/20.0, -virtual_canvas_width/2, virtual_canvas_width/2);
+		total_y = total_y - ydiff/20.0;
+		total_rot = fixup_angle(total_rot - adiff/20.0);
+
+
+
+
 	}
 	
 	return 0;
