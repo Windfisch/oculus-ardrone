@@ -34,6 +34,14 @@ int read_completely(int fd, void* buf, size_t len)
 int main(int argc, const char** argv)
 {
 	struct sockaddr_un my_sockaddr;
+	struct navdata_t
+	{
+		double phi;
+		double theta;
+		double psi;
+		double batt;
+	};
+
 	my_sockaddr.sun_family=AF_UNIX;
 	strcpy(my_sockaddr.sun_path, SOCKETPATH);
 	int sockaddrlen = strlen(my_sockaddr.sun_path) + sizeof(my_sockaddr.sun_family);
@@ -52,8 +60,10 @@ int main(int argc, const char** argv)
 	write(sockfd,"get\n",4);
 	read_completely(sockfd, buffer, 4);
 	int framelen = ((buffer[0]*256+buffer[1])*256+buffer[2])*256+buffer[3];
-	if (framelen > sizeof(buffer)) suicide("buffer too small");
-	read_completely(sockfd, buffer, framelen);
+	if (framelen + sizeof(navdata_t) > sizeof(buffer)) suicide("buffer too small");
+	read_completely(sockfd, buffer, framelen+sizeof(navdata_t));
+	const navdata_t* navdata = (navdata_t*)(buffer + framelen);
+	printf("%lf\t%lf\t%lf\t%lf\n", navdata->phi, navdata->theta, navdata->psi, navdata->batt);
 	char key;
 	bool go=true;
 	bool new_vals=true;
@@ -139,8 +149,11 @@ int main(int argc, const char** argv)
 			write(sockfd,"get\n",4);
 			read_completely(sockfd, buffer, 4);
 			int framelen = ((buffer[0]*256+buffer[1])*256+buffer[2])*256+buffer[3];
-			if (framelen > sizeof(buffer)) suicide("buffer too small");
-			read_completely(sockfd, buffer, framelen);
+			if (framelen + sizeof(navdata_t) > sizeof(buffer)) suicide("buffer too small");
+			read_completely(sockfd, buffer, framelen+sizeof(navdata_t));
+	
+			const navdata_t* navdata = (navdata_t*)(buffer + framelen);
+			printf("%lf\t%lf\t%lf\t%lf\n", navdata->phi, navdata->theta, navdata->psi, navdata->batt);
 		}
 
 		//Mat dingens=Mat::eye(100,100,CV_8UC1) * 244;
