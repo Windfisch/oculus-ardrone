@@ -99,6 +99,34 @@ int main(int argc, const char** argv)
 		total_y += shift_y;
 		total_rot = fixup_angle(total_rot+angle);
 
+		ringbuf_x.put(total_x);
+		ringbuf_y.put(total_y);
+		ringbuf_a.put(total_rot);
+		ringbuf_phi.put(navdata.phi);
+		ringbuf_psi.put(navdata.psi);
+		ringbuf_theta.put(navdata.theta);
+
+		double xdiff = fixup_range( ringbuf_x.get() - px_per_deg*ringbuf_psi.get(), -virtual_canvas_width/2, virtual_canvas_width/2);
+		double ydiff = ringbuf_y.get() + px_per_deg*ringbuf_theta.get();
+		double adiff = fixup_angle(ringbuf_a.get() - (-ringbuf_phi.get()));
+		
+		//if (fabs(xdiff) < px_per_deg) xdiff = 0.0;
+		//if (fabs(ydiff) < px_per_deg) ydiff = 0.0;
+		//if (fabs(adiff) < 2) adiff = 0.0;
+
+		xdiff*=0.3;
+		ydiff*=0.3;
+		adiff*=0.3;
+		total_x = fixup_range(total_x - xdiff, -virtual_canvas_width/2, virtual_canvas_width/2);
+		total_y = total_y - ydiff;
+		total_rot = fixup_angle(total_rot - adiff);
+		ringbuf_x.add(-xdiff);
+		ringbuf_y.add(-ydiff);
+		ringbuf_a.add(-adiff);
+
+
+
+
 		printf("sh:  %i\t%i\t%f\n", shift_x, shift_y, angle);
 		printf("tot: %i\t%i\t%f\n", total_x, total_y, total_rot);
 
@@ -119,24 +147,6 @@ int main(int argc, const char** argv)
 		imshow("screencontent", screencontent);
 
 		oldgray = gray.clone();
-
-
-		ringbuf_x.put(total_x);
-		ringbuf_y.put(total_y);
-		ringbuf_a.put(total_rot);
-		ringbuf_phi.put(navdata.phi);
-		ringbuf_psi.put(navdata.psi);
-		ringbuf_theta.put(navdata.theta);
-
-		double xdiff = fixup_range( ringbuf_x.get() - px_per_deg*ringbuf_psi.get(), -virtual_canvas_width/2, virtual_canvas_width/2);
-		double ydiff = ringbuf_y.get() + px_per_deg*ringbuf_theta.get();
-		double adiff = fixup_angle(ringbuf_a.get() - (-ringbuf_phi.get()));
-
-		total_x = fixup_range(total_x - xdiff/20.0, -virtual_canvas_width/2, virtual_canvas_width/2);
-		total_y = total_y - ydiff/20.0;
-		total_rot = fixup_angle(total_rot - adiff/20.0);
-
-
 
 
 	}

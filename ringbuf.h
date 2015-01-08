@@ -123,4 +123,12 @@ class ModuloRingbuffer
 	{
 		rb->set(_fixup_range(val));
 	}
+
+	void add(double val)
+	{
+		rb->add(val);
+		
+		while (get() < low) rb->add(span);
+		while (get()>= upp) rb->add(-span);
+	}
 };
