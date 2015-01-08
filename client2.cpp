@@ -32,10 +32,33 @@ float fixup_angle(float a)
 	return fixup_range(a,-180,180);
 }
 
+void calc_undistort_maps(float px_per_deg, int width, int height, Mat& map1, Mat& map2)
+{
+	Mat camera_matrix(3,3,CV_32FC1);
+	camera_matrix.at<float>(0,0)=1.0; //fx
+	camera_matrix.at<float>(1,1)=1.0; //fy
+	camera_matrix.at<float>(2,2)=1.0; // 1
+	camera_matrix.at<float>(0,2)=1280/2.; //cx
+	camera_matrix.at<float>(1,2)=720/2.; //cy
+	Mat camera_matrix2 = camera_matrix.clone();
+	camera_matrix2.at<float>(0,2)=width/2.; //cx
+	camera_matrix2.at<float>(1,2)=height/2.; //cy
+
+	float px_per_rad = px_per_deg * PI / 180.;
+
+	Matx<float,1,5> dist_coeffs(-px_per_rad*px_per_rad/3.f, px_per_rad*px_per_rad*px_per_rad*px_per_rad/5.f, 0.f, 0.f, -px_per_rad*px_per_rad*px_per_rad*px_per_rad*px_per_rad*px_per_rad/7.f);
+
+	initUndistortRectifyMap(camera_matrix, dist_coeffs, Mat(), camera_matrix2, Size(width,height), CV_32FC1, map1, map2);
+}
+
 int main(int argc, const char** argv)
 {
 	DroneConnection drone(SOCKETPATH);
 	navdata_t navdata;
+
+	Mat white(Size(1280,720), CV_8UC3, Scalar(255,255,255));
+	Mat map1, map2;
+	calc_undistort_maps(80/1280., 1280,720, map1, map2);
 
 	float scale_factor = 0.2;
 	float diag = sqrt(1280*1280+720*720);
@@ -53,7 +76,9 @@ int main(int argc, const char** argv)
 	float total_rot = 0.0;
 
 	Mat frame, gray, oldgray;
-	Mat screencontent(real_canvas_height,real_canvas_width, CV_32FC3);
+	Mat screencontent(real_canvas_height,real_canvas_width, CV_8UC3);
+	Mat screencontent_(real_canvas_height,real_canvas_width, CV_8UC3);
+	Mat screencontent_mask(real_canvas_height,real_canvas_width, CV_8UC3);
 
 	#define RINGBUF_SIZE 10
 	ModuloRingbuffer ringbuf_x(RINGBUF_SIZE, -virtual_canvas_width/2, virtual_canvas_width/2);
@@ -66,19 +91,26 @@ int main(int argc, const char** argv)
 
 	for (int i=0; i<160;i++)
 	{
-		drone.get(frame, &navdata);
+		Mat frame_;
+		drone.get(frame_, &navdata);
+		remap(frame_, frame, map1, map2, INTER_LINEAR);
 		cvtColor(frame, oldgray, COLOR_BGR2GRAY);
 	}
 
 	while (waitKey(1) != 'x')
 	{
-		drone.get(frame, &navdata);
+		Mat frame_;
+		drone.get(frame_, &navdata);
+		
+		//for (int i=0; i<1280; i+=50) frame_.col(i)=Scalar(0,255,255);
+		//for (int i=0; i<720; i+=50) frame_.row(i)=Scalar(0,255,255);
+
+		remap(frame_, frame, map1, map2, INTER_LINEAR);
+		cvtColor(frame, gray, COLOR_BGR2GRAY);
 
 		imshow("dingens",frame);
 
-		cvtColor(frame, gray, COLOR_BGR2GRAY);
 		Mat mat = estimateRigidTransform(gray, oldgray, false);
-		printf("_____ %i\n", mat.type());
 
 		float angle; int shift_x, shift_y;
 		if (mat.total() > 0)
@@ -135,7 +167,17 @@ int main(int argc, const char** argv)
 		rotmat.at<double>(0,2) += total_x*scale_factor - width/2  + real_canvas_width/2;
 		rotmat.at<double>(1,2) += total_y*scale_factor - height/2 + real_canvas_height/2;
 
-		warpAffine(frame, screencontent, rotmat, Size(real_canvas_width, real_canvas_height));
+		warpAffine(frame, screencontent_    , rotmat, Size(real_canvas_width, real_canvas_height));
+		warpAffine(white, screencontent_mask, rotmat, Size(real_canvas_width, real_canvas_height));
+
+		threshold(screencontent_mask, screencontent_mask, 254, 255, THRESH_BINARY);
+		erode(screencontent_mask, screencontent_mask, Mat::ones(2,2, CV_8U));
+		
+		Mat screencontent_mask2;
+		erode(screencontent_mask, screencontent_mask2, Mat::ones(30,200, CV_8U));
+		
+		screencontent = (screencontent & (~screencontent_mask2)) + (screencontent_ & screencontent_mask2);
+		Mat screencontent_displayed = (screencontent & (~screencontent_mask)) + (screencontent_ & screencontent_mask);
 
 		printf("%i/%i\n", screencontent.size().width, screencontent.size().height);
 		if (total_x > 0)
@@ -144,7 +186,7 @@ int main(int argc, const char** argv)
 			
 			screencontent.colRange( real_canvas_width - 2*real_canvas_extra_width, real_canvas_width) = screencontent.colRange(0, (2*real_canvas_extra_width));
 
-		imshow("screencontent", screencontent);
+		imshow("screencontent", screencontent_displayed);
 
 		oldgray = gray.clone();
 
