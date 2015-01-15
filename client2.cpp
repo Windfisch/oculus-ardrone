@@ -1,3 +1,7 @@
+#define GLEW_STATIC
+#include <GL/glew.h>
+#include <GLFW/glfw3.h>
+
 #include <unistd.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -15,6 +19,137 @@
 using namespace cv;
 
 #define SOCKETPATH "/home/flo/uds_socket"
+
+
+
+
+
+
+const char* justDrawASpriteVertexSource =
+	"#version 150\n"
+	"in vec2 position;\n"
+	"in vec2 texcoord;\n"
+	"out vec2 Texcoord;\n"
+	"void main()\n"
+	"{\n"
+	"	gl_Position = vec4(position, 0.0, 1.0);\n"
+	"	Texcoord = texcoord;\n"
+	"}\n";
+
+const char* justDrawASpriteFragmentSource =
+	"#version 150\n"
+	"uniform sampler2D texVideo;\n"
+	"in vec2 Texcoord;\n"
+	"out vec4 outColor;\n"
+	"void main()\n"
+	"{\n"
+	"	outColor = texture(texVideo, Texcoord);\n"
+	"}\n";
+
+
+float vertices[] = {
+	-1.f,  1.f,  0.0f,0.0f,  // Vertex 1 (X, Y)
+	 1.f,  1.f,  1.0f,0.0f,  // Vertex 2 (X, Y)
+	 1.f, -1.f, 1.0f,1.0f,  // Vertex 3 (X, Y)
+
+	 1.f, -1.f, 1.0f,1.0f,  // Vertex 3 (X, Y)
+	-1.f, -1.f,  0.0f,1.0f,  // Vertex 4 (X, Y)
+	-1.f,  1.f,  0.0f,0.0f  // Vertex 1 (X, Y)
+};
+
+void calcVerticesRotated(int xshift, int yshift, float angle, float* v)
+{
+	Mat rotmat = getRotationMatrix2D(Point2f(0,0), angle, 1.0);
+	Point2f pt;
+	pt = Point2f( -cos(angle)/1280. + sin(angle)/720., -sin(angle)/1280. - cos(angle)/720. );
+	v[0]=v[20]=pt.x*1280;
+	v[1]=v[21]=pt.y*720;
+	v[8]=v[12]=-pt.x*1280;
+	v[9]=v[13]=-pt.y*720;
+
+	pt = Point2f( cos(angle)/1280. + sin(angle)/720., sin(angle)/1280. - cos(angle)/720. );
+	v[4]=pt.x*1280;
+	v[5]=pt.y*720;
+	v[16]=-pt.x*1280;
+	v[17]=-pt.y*720;
+}
+
+
+void compileShaderProgram(const GLchar* vertSrc, const GLchar* fragSrc, GLuint& vertexShader, GLuint& fragmentShader, GLuint& shaderProgram)
+{
+	GLint status;
+	char buffer[512];
+	
+	vertexShader = glCreateShader(GL_VERTEX_SHADER);
+	glShaderSource(vertexShader, 1, &vertSrc, NULL);
+	glCompileShader(vertexShader);
+	glGetShaderiv(vertexShader, GL_COMPILE_STATUS, &status);
+	glGetShaderInfoLog(vertexShader, 512, NULL, buffer);
+	printf("vertex shader log:\n%s\n\n\n", buffer);
+
+	fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
+	glShaderSource(fragmentShader, 1, &fragSrc, NULL);
+	glCompileShader(fragmentShader);
+	glGetShaderiv(fragmentShader, GL_COMPILE_STATUS, &status);
+	glGetShaderInfoLog(fragmentShader, 512, NULL, buffer);
+	printf("fragment shader log:\n%s\n\n\n", buffer);
+
+	// assemble shader program
+	shaderProgram = glCreateProgram();
+	glAttachShader(shaderProgram, vertexShader);
+	glAttachShader(shaderProgram, fragmentShader);
+	glBindFragDataLocation(shaderProgram, 0, "outColor"); // not neccessary
+	glLinkProgram(shaderProgram);
+}
+
+GLuint justDrawASpriteShaderProgram(GLuint vao, GLuint vbo)
+{
+	GLuint vertexShader, fragmentShader, shaderProgram;
+	compileShaderProgram(justDrawASpriteVertexSource, justDrawASpriteFragmentSource, vertexShader, fragmentShader, shaderProgram);
+
+
+	glBindVertexArray(vao);
+	glBindBuffer(GL_ARRAY_BUFFER, vbo);
+	
+	// set up shaders
+	GLint posAttrib = glGetAttribLocation(shaderProgram, "position");
+	glEnableVertexAttribArray(posAttrib);
+	glVertexAttribPointer(posAttrib, 2, GL_FLOAT, GL_FALSE, 4*sizeof(float), 0);
+
+
+	GLint texAttrib = glGetAttribLocation(shaderProgram, "texcoord");
+	glEnableVertexAttribArray(texAttrib);
+	glVertexAttribPointer(texAttrib, 2, GL_FLOAT, GL_FALSE, 4*sizeof(float), (void*)(2*sizeof(float)));
+
+	return shaderProgram;
+}
+
+GLFWwindow* initOpenGL()
+{
+	glfwInit();
+
+	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 2);
+	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+	glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
+
+	glfwWindowHint(GLFW_RESIZABLE, GL_FALSE);
+
+	GLFWwindow* window = glfwCreateWindow(800, 600, "OpenGL", NULL, NULL); // Windowed
+	// GLFWwindow* window = glfwCreateWindow(800, 600, "OpenGL", glfwGetPrimaryMonitor(), nullptr); // Fullscreen
+
+	glfwMakeContextCurrent(window);
+
+	glewExperimental = GL_TRUE;
+	glewInit();
+	
+	return window;
+}
+
+
+
+
+
 
 
 const int width = 1280, height = 720;
@@ -53,6 +188,78 @@ void calc_undistort_maps(float px_per_deg, int width, int height, Mat& map1, Mat
 
 int main(int argc, const char** argv)
 {
+
+	GLFWwindow* window = initOpenGL();
+
+
+	GLuint vaoCanvas, vaoQuad;
+	glGenVertexArrays(1, &vaoCanvas);
+	glGenVertexArrays(1, &vaoQuad);
+
+
+	GLuint vboCanvas, vboQuad;
+	glGenBuffers(1, &vboCanvas);
+	glGenBuffers(1, &vboQuad);
+
+	calcVerticesRotated(0,0,0.,vertices);
+
+	glBindBuffer(GL_ARRAY_BUFFER, vboCanvas);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+
+	//glBindBuffer(GL_ARRAY_BUFFER, vboQuad);
+	//glBufferData(GL_ARRAY_BUFFER, sizeof(quadVertices), quadVertices, GL_STATIC_DRAW);
+
+
+
+
+	
+	// compile shaders
+	GLuint shaderProgram = justDrawASpriteShaderProgram(vaoCanvas, vboCanvas);
+
+
+	// texture
+	GLuint texVideo;
+	glGenTextures(1, &texVideo);
+	glBindTexture(GL_TEXTURE_2D, texVideo);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	
+
+/*
+// Framebuffer stuff
+	GLuint frameBuffer;
+	glGenFramebuffers(1, &frameBuffer);
+	glBindFramebuffer(GL_FRAMEBUFFER, frameBuffer);
+	
+	GLuint texColorBuffer;
+	glGenTextures(1, &texColorBuffer);
+	glBindTexture(GL_TEXTURE_2D, texColorBuffer);
+
+	glTexImage2D(
+	    GL_TEXTURE_2D, 0, GL_RGB, 8000, 6000, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL
+	);
+
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+	glFramebufferTexture2D(
+	    GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texColorBuffer, 0
+	);
+*/
+
+
+
+
+
+
+
+
+
+
+
+
 	DroneConnection drone(SOCKETPATH);
 	navdata_t navdata;
 
@@ -89,7 +296,7 @@ int main(int argc, const char** argv)
 	ModuloRingbuffer ringbuf_theta(RINGBUF_SIZE, -180,180);
 
 
-	for (int i=0; i<160;i++)
+	for (int i=0; i<400;i++)
 	{
 		Mat frame_;
 		drone.get(frame_, &navdata);
@@ -102,6 +309,9 @@ int main(int argc, const char** argv)
 		Mat frame_;
 		drone.get(frame_, &navdata);
 		
+
+		
+
 		//for (int i=0; i<1280; i+=50) frame_.col(i)=Scalar(0,255,255);
 		//for (int i=0; i<720; i+=50) frame_.row(i)=Scalar(0,255,255);
 
@@ -109,6 +319,39 @@ int main(int argc, const char** argv)
 		cvtColor(frame, gray, COLOR_BGR2GRAY);
 
 		imshow("dingens",frame);
+		glBindTexture(GL_TEXTURE_2D, texVideo);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, frame.size().width, frame.size().height, 0, GL_RGB, GL_UNSIGNED_BYTE, frame.ptr<unsigned char>(0));
+
+
+
+
+		glBindVertexArray(vaoCanvas);
+		glUseProgram(shaderProgram);
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(GL_TEXTURE_2D, texVideo);
+		glDrawArrays(GL_TRIANGLES, 0, 6);
+
+
+
+		glfwSwapBuffers(window);
+		glfwPollEvents();
+
+		if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
+			glfwSetWindowShouldClose(window, GL_TRUE);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 		Mat mat = estimateRigidTransform(gray, oldgray, false);
 
@@ -193,5 +436,8 @@ int main(int argc, const char** argv)
 
 	}
 	
+	//glDeleteFramebuffers(1, &frameBuffer);
+
+	glfwTerminate();
 	return 0;
 }

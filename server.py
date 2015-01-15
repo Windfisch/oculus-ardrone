@@ -123,7 +123,7 @@ while True:
             manual_override_z = True
             manual_override_rot = True
         if btn_leftshoulder and btn_rightshoulder and js.get_button(10):
-            drone.takeoff()
+            #drone.takeoff()
             manual_override_xy = True
             manual_override_z = True
             manual_override_rot = True
