@@ -169,7 +169,7 @@ float fixup_angle(float a)
 
 void calc_undistort_maps(float px_per_deg, int width, int height, Mat& map1, Mat& map2)
 {
-	Mat camera_matrix(3,3,CV_32FC1);
+	Mat camera_matrix= Mat::zeros(3,3,CV_32FC1);
 	camera_matrix.at<float>(0,0)=1.0; //fx
 	camera_matrix.at<float>(1,1)=1.0; //fy
 	camera_matrix.at<float>(2,2)=1.0; // 1
@@ -307,47 +307,11 @@ int main(int argc, const char** argv)
 	{
 		drone.get(frame_, &navdata);
 		
-
-		
-
 		//for (int i=0; i<1280; i+=50) frame_.col(i)=Scalar(0,255,255);
 		//for (int i=0; i<720; i+=50) frame_.row(i)=Scalar(0,255,255);
 
 		remap(frame_, frame, map1, map2, INTER_LINEAR);
 		cvtColor(frame, gray, COLOR_BGR2GRAY);
-		
-		glBindTexture(GL_TEXTURE_2D, texVideo);
-		Mat frame_gl = frame.clone();
-		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, frame_gl.size().width, frame_gl.size().height, 0, GL_RGB, GL_UNSIGNED_BYTE, frame_gl.ptr<unsigned char>(0));
-
-
-		calcVerticesRotated(total_x, -total_y,-total_rot*PI/180.,vertices);
-
-		glBindBuffer(GL_ARRAY_BUFFER, vboCanvas);
-		glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
-
-
-		glBindVertexArray(vaoCanvas);
-		glUseProgram(shaderProgram);
-		glActiveTexture(GL_TEXTURE0);
-		glBindTexture(GL_TEXTURE_2D, texVideo);
-		glDrawArrays(GL_TRIANGLES, 0, 6);
-
-
-
-		glfwSwapBuffers(window);
-		glfwPollEvents();
-
-		if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
-			glfwSetWindowShouldClose(window, GL_TRUE);
-
-		imshow("dingens",frame_);
-
-
-
-
-
-
 
 
 
@@ -392,8 +356,8 @@ int main(int argc, const char** argv)
 		//if (fabs(ydiff) < px_per_deg) ydiff = 0.0;
 		//if (fabs(adiff) < 2) adiff = 0.0;
 
-		xdiff*=0.01;
-		ydiff*=0.01;
+		xdiff*=0.0;
+		ydiff*=0.0;
 		adiff*=0.1;
 		total_x = fixup_range(total_x - xdiff, -virtual_canvas_width/2, virtual_canvas_width/2);
 		total_y = total_y - ydiff;
@@ -401,6 +365,59 @@ int main(int argc, const char** argv)
 		ringbuf_x.add(-xdiff);
 		ringbuf_y.add(-ydiff);
 		ringbuf_a.add(-adiff);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+		glBindTexture(GL_TEXTURE_2D, texVideo);
+		Mat frame_gl = frame.clone();
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, frame_gl.size().width, frame_gl.size().height, 0, GL_RGB, GL_UNSIGNED_BYTE, frame_gl.ptr<unsigned char>(0));
+
+
+		calcVerticesRotated(total_x, -total_y,-total_rot*PI/180.,vertices);
+
+		glBindBuffer(GL_ARRAY_BUFFER, vboCanvas);
+		glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+
+
+		glBindVertexArray(vaoCanvas);
+		glUseProgram(shaderProgram);
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(GL_TEXTURE_2D, texVideo);
+		glDrawArrays(GL_TRIANGLES, 0, 6);
+
+
+
+		glfwSwapBuffers(window);
+		glfwPollEvents();
+
+		if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
+			glfwSetWindowShouldClose(window, GL_TRUE);
+
+		imshow("dingens",frame_);
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
