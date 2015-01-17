@@ -59,19 +59,19 @@ float vertices[] = {
 
 void calcVerticesRotated(int xshift, int yshift, float angle, float* v)
 {
-	Mat rotmat = getRotationMatrix2D(Point2f(0,0), angle, 1.0);
 	Point2f pt;
-	pt = Point2f( -cos(angle)/1280. + sin(angle)/720., -sin(angle)/1280. - cos(angle)/720. );
-	v[0]=v[20]=pt.x*1280;
-	v[1]=v[21]=pt.y*720;
-	v[8]=v[12]=-pt.x*1280;
-	v[9]=v[13]=-pt.y*720;
+	float scale = 0.4;
+	pt = Point2f( -cos(angle)*1280./2 + sin(angle)*720./2, +sin(angle)*1280./2 + cos(angle)*720./2 );
+	v[0]=v[20]=( pt.x + xshift)/1280 * scale;
+	v[1]=v[21]=( pt.y + yshift)/720  * scale;
+	v[8]=v[12]=(-pt.x + xshift)/1280 * scale;
+	v[9]=v[13]=(-pt.y + yshift)/720  * scale;
 
-	pt = Point2f( cos(angle)/1280. + sin(angle)/720., sin(angle)/1280. - cos(angle)/720. );
-	v[4]=pt.x*1280;
-	v[5]=pt.y*720;
-	v[16]=-pt.x*1280;
-	v[17]=-pt.y*720;
+	pt = Point2f( cos(angle)*1280./2 + sin(angle)*720./2, -sin(angle)*1280./2 + cos(angle)*720./2 );
+	v[4] =( pt.x + xshift)/1280 * scale;
+	v[5] =( pt.y + yshift)/720  * scale;
+	v[16]=(-pt.x + xshift)/1280 * scale;
+	v[17]=(-pt.y + yshift)/720  * scale;
 }
 
 
@@ -135,7 +135,7 @@ GLFWwindow* initOpenGL()
 
 	glfwWindowHint(GLFW_RESIZABLE, GL_FALSE);
 
-	GLFWwindow* window = glfwCreateWindow(800, 600, "OpenGL", NULL, NULL); // Windowed
+	GLFWwindow* window = glfwCreateWindow(1280, 720, "OpenGL", NULL, NULL); // Windowed
 	// GLFWwindow* window = glfwCreateWindow(800, 600, "OpenGL", glfwGetPrimaryMonitor(), nullptr); // Fullscreen
 
 	glfwMakeContextCurrent(window);
@@ -201,7 +201,7 @@ int main(int argc, const char** argv)
 	glGenBuffers(1, &vboCanvas);
 	glGenBuffers(1, &vboQuad);
 
-	calcVerticesRotated(0,0,0.,vertices);
+	calcVerticesRotated(0,0,PI/2,vertices);
 
 	glBindBuffer(GL_ARRAY_BUFFER, vboCanvas);
 	glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
@@ -264,7 +264,7 @@ int main(int argc, const char** argv)
 	navdata_t navdata;
 
 	Mat white(Size(1280,720), CV_8UC3, Scalar(255,255,255));
-	Mat map1, map2;
+	Mat map1(Size(width,height), CV_32FC1), map2(Size(width,height), CV_32FC1);
 	calc_undistort_maps(80/1280., 1280,720, map1, map2);
 
 	float scale_factor = 0.2;
@@ -282,7 +282,7 @@ int main(int argc, const char** argv)
 	int total_x = 100, total_y = 00;
 	float total_rot = 0.0;
 
-	Mat frame, gray, oldgray;
+	Mat frame(Size(1280,720), CV_8UC3), frame_(Size(1280,720), CV_8UC3), gray, oldgray;
 	Mat screencontent(real_canvas_height,real_canvas_width, CV_8UC3);
 	Mat screencontent_(real_canvas_height,real_canvas_width, CV_8UC3);
 	Mat screencontent_mask(real_canvas_height,real_canvas_width, CV_8UC3);
@@ -298,7 +298,6 @@ int main(int argc, const char** argv)
 
 	for (int i=0; i<400;i++)
 	{
-		Mat frame_;
 		drone.get(frame_, &navdata);
 		remap(frame_, frame, map1, map2, INTER_LINEAR);
 		cvtColor(frame, oldgray, COLOR_BGR2GRAY);
@@ -306,7 +305,6 @@ int main(int argc, const char** argv)
 
 	while (waitKey(1) != 'x')
 	{
-		Mat frame_;
 		drone.get(frame_, &navdata);
 		
 
@@ -317,12 +315,16 @@ int main(int argc, const char** argv)
 
 		remap(frame_, frame, map1, map2, INTER_LINEAR);
 		cvtColor(frame, gray, COLOR_BGR2GRAY);
-
-		imshow("dingens",frame);
+		
 		glBindTexture(GL_TEXTURE_2D, texVideo);
-		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, frame.size().width, frame.size().height, 0, GL_RGB, GL_UNSIGNED_BYTE, frame.ptr<unsigned char>(0));
+		Mat frame_gl = frame.clone();
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, frame_gl.size().width, frame_gl.size().height, 0, GL_RGB, GL_UNSIGNED_BYTE, frame_gl.ptr<unsigned char>(0));
 
 
+		calcVerticesRotated(total_x, -total_y,-total_rot*PI/180.,vertices);
+
+		glBindBuffer(GL_ARRAY_BUFFER, vboCanvas);
+		glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
 
 
 		glBindVertexArray(vaoCanvas);
@@ -339,6 +341,7 @@ int main(int argc, const char** argv)
 		if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
 			glfwSetWindowShouldClose(window, GL_TRUE);
 
+		imshow("dingens",frame_);
 
 
 
@@ -389,9 +392,9 @@ int main(int argc, const char** argv)
 		//if (fabs(ydiff) < px_per_deg) ydiff = 0.0;
 		//if (fabs(adiff) < 2) adiff = 0.0;
 
-		xdiff*=0.3;
-		ydiff*=0.3;
-		adiff*=0.3;
+		xdiff*=0.01;
+		ydiff*=0.01;
+		adiff*=0.1;
 		total_x = fixup_range(total_x - xdiff, -virtual_canvas_width/2, virtual_canvas_width/2);
 		total_y = total_y - ydiff;
 		total_rot = fixup_angle(total_rot - adiff);

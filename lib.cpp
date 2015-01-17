@@ -64,5 +64,5 @@ void DroneConnection::get(Mat& frame, navdata_t* nav)
 	const navdata_t* navdata = (navdata_t*)(buffer + framelen);
 	memcpy(nav, navdata, sizeof(*navdata));
 
-	frame = Mat(768,1280,CV_8UC3, buffer);
+	frame = Mat(720,1280,CV_8UC3, buffer);
 }
