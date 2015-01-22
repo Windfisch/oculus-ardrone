@@ -25,10 +25,13 @@ using namespace cv;
 
 
 #define PX_PER_DEG_WINDOWSIZE 3
+#define PX_PER_DEG_CANVAS 16
 #define CANVAS_XDEG 450
 #define CANVAS_YDEG 120
-#define CANVAS_WIDTH  CANVAS_XDEG*PX_PER_DEG_WINDOWSIZE
-#define CANVAS_HEIGHT CANVAS_YDEG*PX_PER_DEG_WINDOWSIZE
+#define CANVAS_WIDTH  CANVAS_XDEG*PX_PER_DEG_CANVAS
+#define CANVAS_HEIGHT CANVAS_YDEG*PX_PER_DEG_CANVAS
+#define SCREEN_WIDTH  CANVAS_XDEG*PX_PER_DEG_WINDOWSIZE
+#define SCREEN_HEIGHT CANVAS_YDEG*PX_PER_DEG_WINDOWSIZE
 
 
 
@@ -53,6 +56,18 @@ const char* justDrawASpriteFragmentSource =
 	"	outColor = texture(texVideo, Texcoord);\n"
 	"}\n";
 
+const char* justDrawASpriteFragmentSourceGray =
+	"#version 150\n"
+	"uniform sampler2D texVideo;\n"
+	"in vec2 Texcoord;\n"
+	"out vec4 outColor;\n"
+	"void main()\n"
+	"{\n"
+	"	float gray = (texture(texVideo, Texcoord).r+ texture(texVideo, Texcoord).g + texture(texVideo, Texcoord).b)/3.;\n"
+	"	if (Texcoord.x < 0.5) gray=1.0-gray;\n"
+	"	outColor = vec4(gray,gray,gray,1.0);\n"
+	"}\n";
+
 
 float vertices[] = {
 	-1.f,  1.f,  0.0f,0.0f,  // Vertex 1 (X, Y)
@@ -63,6 +78,18 @@ float vertices[] = {
 	-1.f, -1.f,  0.0f,1.0f,  // Vertex 4 (X, Y)
 	-1.f,  1.f,  0.0f,0.0f  // Vertex 1 (X, Y)
 };
+
+
+float quadVertices[] = {
+	-1.f, -1.f,  0.0f,0.0f,  // Vertex 1 (X, Y)
+	 1.f, -1.f,  1.0f,0.0f,  // Vertex 2 (X, Y)
+	 1.f,  1.f, 1.0f,1.0f,  // Vertex 3 (X, Y)
+
+	 1.f,  1.f, 1.0f,1.0f,  // Vertex 3 (X, Y)
+	-1.f,  1.f,  0.0f,1.0f,  // Vertex 4 (X, Y)
+	-1.f, -1.f,  0.0f,0.0f  // Vertex 1 (X, Y)
+};
+
 
 void calcVerticesRotated(int xshift, int yshift, float angle, float* v)
 {
@@ -108,10 +135,10 @@ void compileShaderProgram(const GLchar* vertSrc, const GLchar* fragSrc, GLuint& 
 	glLinkProgram(shaderProgram);
 }
 
-GLuint justDrawASpriteShaderProgram(GLuint vao, GLuint vbo)
+GLuint justDrawASpriteShaderProgram(GLuint vao, GLuint vbo, bool gray=false)
 {
 	GLuint vertexShader, fragmentShader, shaderProgram;
-	compileShaderProgram(justDrawASpriteVertexSource, justDrawASpriteFragmentSource, vertexShader, fragmentShader, shaderProgram);
+	compileShaderProgram(justDrawASpriteVertexSource, gray? justDrawASpriteFragmentSourceGray : justDrawASpriteFragmentSource, vertexShader, fragmentShader, shaderProgram);
 
 
 	glBindVertexArray(vao);
@@ -141,7 +168,7 @@ GLFWwindow* initOpenGL()
 
 	glfwWindowHint(GLFW_RESIZABLE, GL_FALSE);
 
-	GLFWwindow* window = glfwCreateWindow(CANVAS_WIDTH, CANVAS_HEIGHT, "OpenGL", NULL, NULL); // Windowed
+	GLFWwindow* window = glfwCreateWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "OpenGL", NULL, NULL); // Windowed
 	// GLFWwindow* window = glfwCreateWindow(800, 600, "OpenGL", glfwGetPrimaryMonitor(), nullptr); // Fullscreen
 
 	glfwMakeContextCurrent(window);
@@ -212,8 +239,8 @@ int main(int argc, const char** argv)
 	glBindBuffer(GL_ARRAY_BUFFER, vboCanvas);
 	glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
 
-	//glBindBuffer(GL_ARRAY_BUFFER, vboQuad);
-	//glBufferData(GL_ARRAY_BUFFER, sizeof(quadVertices), quadVertices, GL_STATIC_DRAW);
+	glBindBuffer(GL_ARRAY_BUFFER, vboQuad);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(quadVertices), quadVertices, GL_STATIC_DRAW);
 
 
 
@@ -221,6 +248,7 @@ int main(int argc, const char** argv)
 	
 	// compile shaders
 	GLuint shaderProgram = justDrawASpriteShaderProgram(vaoCanvas, vboCanvas);
+	GLuint quadShaderProgram = justDrawASpriteShaderProgram(vaoQuad, vboQuad, true);
 
 
 	// texture
@@ -233,7 +261,7 @@ int main(int argc, const char** argv)
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 	
 
-/*
+
 // Framebuffer stuff
 	GLuint frameBuffer;
 	glGenFramebuffers(1, &frameBuffer);
@@ -243,17 +271,13 @@ int main(int argc, const char** argv)
 	glGenTextures(1, &texColorBuffer);
 	glBindTexture(GL_TEXTURE_2D, texColorBuffer);
 
-	glTexImage2D(
-	    GL_TEXTURE_2D, 0, GL_RGB, 8000, 6000, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL
-	);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, CANVAS_WIDTH, CANVAS_HEIGHT, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
 
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
-	glFramebufferTexture2D(
-	    GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texColorBuffer, 0
-	);
-*/
+	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texColorBuffer, 0);
+
 
 
 
@@ -384,7 +408,6 @@ int main(int argc, const char** argv)
 
 
 
-
 		glBindTexture(GL_TEXTURE_2D, texVideo);
 		Mat frame_gl = frame.clone();
 		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, frame_gl.size().width, frame_gl.size().height, 0, GL_RGB, GL_UNSIGNED_BYTE, frame_gl.ptr<unsigned char>(0));
@@ -396,10 +419,21 @@ int main(int argc, const char** argv)
 		glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
 
 
+		glBindFramebuffer(GL_FRAMEBUFFER, frameBuffer);
+		glViewport(0,0,CANVAS_WIDTH,CANVAS_HEIGHT);
 		glBindVertexArray(vaoCanvas);
 		glUseProgram(shaderProgram);
 		glActiveTexture(GL_TEXTURE0);
 		glBindTexture(GL_TEXTURE_2D, texVideo);
+		glDrawArrays(GL_TRIANGLES, 0, 6);
+
+
+		glBindFramebuffer(GL_FRAMEBUFFER, 0);
+		glViewport(0,0,SCREEN_WIDTH,SCREEN_HEIGHT);
+		glBindVertexArray(vaoQuad);
+		glUseProgram(quadShaderProgram);
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(GL_TEXTURE_2D, texColorBuffer);
 		glDrawArrays(GL_TRIANGLES, 0, 6);
 
 
