@@ -21,9 +21,14 @@ using namespace cv;
 #define SOCKETPATH "/home/flo/uds_socket"
 
 
+#define PX_PER_DEG 16.0
 
-#define CANVAS_WIDTH  1280
-#define CANVAS_HEIGHT 400
+
+#define PX_PER_DEG_WINDOWSIZE 3
+#define CANVAS_XDEG 450
+#define CANVAS_YDEG 120
+#define CANVAS_WIDTH  CANVAS_XDEG*PX_PER_DEG_WINDOWSIZE
+#define CANVAS_HEIGHT CANVAS_YDEG*PX_PER_DEG_WINDOWSIZE
 
 
 
@@ -62,18 +67,17 @@ float vertices[] = {
 void calcVerticesRotated(int xshift, int yshift, float angle, float* v)
 {
 	Point2f pt;
-	float scale = 0.2;
 	pt = Point2f( -cos(angle)*1280./2 + sin(angle)*720./2, +sin(angle)*1280./2 + cos(angle)*720./2 );
-	v[0]=v[20]=( pt.x + xshift)/CANVAS_WIDTH  * scale;
-	v[1]=v[21]=( pt.y + yshift)/CANVAS_HEIGHT * scale;
-	v[8]=v[12]=(-pt.x + xshift)/CANVAS_WIDTH  * scale;
-	v[9]=v[13]=(-pt.y + yshift)/CANVAS_HEIGHT * scale;
+	v[0]=v[20]=(float) ( pt.x + xshift) / PX_PER_DEG / CANVAS_XDEG * 2;
+	v[1]=v[21]=(float) ( pt.y + yshift) / PX_PER_DEG / CANVAS_YDEG * 2;
+	v[8]=v[12]=(float) (-pt.x + xshift) / PX_PER_DEG / CANVAS_XDEG * 2;
+	v[9]=v[13]=(float) (-pt.y + yshift) / PX_PER_DEG / CANVAS_YDEG * 2;
 
 	pt = Point2f( cos(angle)*1280./2 + sin(angle)*720./2, -sin(angle)*1280./2 + cos(angle)*720./2 );
-	v[4] =( pt.x + xshift)/CANVAS_WIDTH  * scale;
-	v[5] =( pt.y + yshift)/CANVAS_HEIGHT * scale;
-	v[16]=(-pt.x + xshift)/CANVAS_WIDTH  * scale;
-	v[17]=(-pt.y + yshift)/CANVAS_HEIGHT * scale;
+	v[4] =(float) ( pt.x + xshift) / PX_PER_DEG / CANVAS_XDEG * 2;
+	v[5] =(float) ( pt.y + yshift)/ PX_PER_DEG / CANVAS_YDEG * 2;
+	v[16]=(float) (-pt.x + xshift)/ PX_PER_DEG / CANVAS_XDEG * 2;
+	v[17]=(float) (-pt.y + yshift) / PX_PER_DEG / CANVAS_YDEG * 2;
 }
 
 
