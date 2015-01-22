@@ -22,6 +22,8 @@ using namespace cv;
 
 
 
+#define CANVAS_WIDTH  1280
+#define CANVAS_HEIGHT 400
 
 
 
@@ -60,18 +62,18 @@ float vertices[] = {
 void calcVerticesRotated(int xshift, int yshift, float angle, float* v)
 {
 	Point2f pt;
-	float scale = 0.4;
+	float scale = 0.2;
 	pt = Point2f( -cos(angle)*1280./2 + sin(angle)*720./2, +sin(angle)*1280./2 + cos(angle)*720./2 );
-	v[0]=v[20]=( pt.x + xshift)/1280 * scale;
-	v[1]=v[21]=( pt.y + yshift)/720  * scale;
-	v[8]=v[12]=(-pt.x + xshift)/1280 * scale;
-	v[9]=v[13]=(-pt.y + yshift)/720  * scale;
+	v[0]=v[20]=( pt.x + xshift)/CANVAS_WIDTH  * scale;
+	v[1]=v[21]=( pt.y + yshift)/CANVAS_HEIGHT * scale;
+	v[8]=v[12]=(-pt.x + xshift)/CANVAS_WIDTH  * scale;
+	v[9]=v[13]=(-pt.y + yshift)/CANVAS_HEIGHT * scale;
 
 	pt = Point2f( cos(angle)*1280./2 + sin(angle)*720./2, -sin(angle)*1280./2 + cos(angle)*720./2 );
-	v[4] =( pt.x + xshift)/1280 * scale;
-	v[5] =( pt.y + yshift)/720  * scale;
-	v[16]=(-pt.x + xshift)/1280 * scale;
-	v[17]=(-pt.y + yshift)/720  * scale;
+	v[4] =( pt.x + xshift)/CANVAS_WIDTH  * scale;
+	v[5] =( pt.y + yshift)/CANVAS_HEIGHT * scale;
+	v[16]=(-pt.x + xshift)/CANVAS_WIDTH  * scale;
+	v[17]=(-pt.y + yshift)/CANVAS_HEIGHT * scale;
 }
 
 
@@ -135,7 +137,7 @@ GLFWwindow* initOpenGL()
 
 	glfwWindowHint(GLFW_RESIZABLE, GL_FALSE);
 
-	GLFWwindow* window = glfwCreateWindow(1280, 720, "OpenGL", NULL, NULL); // Windowed
+	GLFWwindow* window = glfwCreateWindow(CANVAS_WIDTH, CANVAS_HEIGHT, "OpenGL", NULL, NULL); // Windowed
 	// GLFWwindow* window = glfwCreateWindow(800, 600, "OpenGL", glfwGetPrimaryMonitor(), nullptr); // Fullscreen
 
 	glfwMakeContextCurrent(window);

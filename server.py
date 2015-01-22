@@ -8,6 +8,8 @@ import threading
 import time
 import struct
 
+OVERRIDE_THRESHOLD=0.01
+
 def putStatusText(img, text, pos, activated):
     cv2.putText(img, text, pos, cv2.FONT_HERSHEY_PLAIN, 1, (0,0,255) if activated else (127,127,127), 2 if activated else 1)
 
@@ -144,7 +146,7 @@ while True:
         js_radius =  math.sqrt(js_x**2 + js_y**2)
         if btn_leftshoulder==0:
             js_x, js_y =  ( js_x * cos(rel_angle) + js_y * sin(rel_angle) )   ,  ( -js_x * sin(rel_angle) + js_y * cos(rel_angle) )
-        
+
         js_hover = (btn_rightshoulder==0 and (js_radius <= 0.01))
 
         if (js_radius > OVERRIDE_THRESHOLD): manual_override_xy = True
