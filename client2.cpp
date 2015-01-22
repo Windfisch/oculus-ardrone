@@ -81,13 +81,13 @@ float vertices[] = {
 
 
 float quadVertices[] = {
-	-1.f, -1.f,  0.0f,0.0f,  // Vertex 1 (X, Y)
-	 1.f, -1.f,  1.0f,0.0f,  // Vertex 2 (X, Y)
-	 1.f,  1.f, 1.0f,1.0f,  // Vertex 3 (X, Y)
+	-1.f, -1.f,  0.4f,0.4f,  // Vertex 1 (X, Y)
+	 1.f, -1.f,  0.6f,0.4f,  // Vertex 2 (X, Y)
+	 1.f,  1.f, 0.6f,0.6f,  // Vertex 3 (X, Y)
 
-	 1.f,  1.f, 1.0f,1.0f,  // Vertex 3 (X, Y)
-	-1.f,  1.f,  0.0f,1.0f,  // Vertex 4 (X, Y)
-	-1.f, -1.f,  0.0f,0.0f  // Vertex 1 (X, Y)
+	 1.f,  1.f, 0.6f,0.6f,  // Vertex 3 (X, Y)
+	-1.f,  1.f,  0.4f,0.6f,  // Vertex 4 (X, Y)
+	-1.f, -1.f,  0.4f,0.4f  // Vertex 1 (X, Y)
 };
 
 
@@ -248,7 +248,7 @@ int main(int argc, const char** argv)
 	
 	// compile shaders
 	GLuint shaderProgram = justDrawASpriteShaderProgram(vaoCanvas, vboCanvas);
-	GLuint quadShaderProgram = justDrawASpriteShaderProgram(vaoQuad, vboQuad, true);
+	GLuint quadShaderProgram = justDrawASpriteShaderProgram(vaoQuad, vboQuad);
 
 
 	// texture
