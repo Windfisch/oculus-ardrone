@@ -7,6 +7,8 @@ import sys
 import threading
 import time
 import struct
+import math
+from math import sin,cos,tan
 
 OVERRIDE_THRESHOLD=0.01
 
@@ -44,6 +46,7 @@ class ServerThread(threading.Thread):
                             global_cmd_y = float(values[1])
                             global_cmd_z = float(values[2])
                             global_cmd_rot = float(values[3])
+                            global_cmd_hover =  False # TODO XXX
                             lock.release()
                     else:
                         print >>sys.stderr, 'no more data from', client_address
@@ -91,6 +94,11 @@ manual_override_xy = True
 manual_override_z = True
 manual_override_rot = True
 
+global_cmd_x = 0
+global_cmd_y = 0
+global_cmd_z = 0
+global_cmd_rot = 0
+global_cmd_hover =  False # TODO XXX
 
 drone = libardrone.ARDrone(True, True)
 drone.reset()
@@ -113,6 +121,8 @@ global_frame =  None
 serverthread.start()
 while True:
     if no_flight == False:
+        pygame.event.pump()
+
         btn_leftshoulder =  js.get_button(4) or js.get_button(6)
         btn_rightshoulder = js.get_button(5) or js.get_button(7)
         btn_thumb = js.get_button(0) or js.get_button(1) or js.get_button(2) or js.get_button(3)
@@ -121,15 +131,18 @@ while True:
 
         if btn_thumb:
             drone.land()
+            print "landing"
             manual_override_xy = True
             manual_override_z = True
             manual_override_rot = True
         if btn_leftshoulder and btn_rightshoulder and js.get_button(10):
-            #drone.takeoff()
+            drone.takeoff()
+            print "taking off"
             manual_override_xy = True
             manual_override_z = True
             manual_override_rot = True
         if btn_all:
+            print "resetting"
             drone.reset()
             manual_override_xy = True
             manual_override_z = True
