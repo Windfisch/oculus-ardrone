@@ -33,6 +33,11 @@ class Ringbuffer
 
 		return avg;
 	}
+	
+	double front()
+	{
+		return buf[idx];
+	}
 
 	void put(double val)
 	{

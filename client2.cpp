@@ -81,13 +81,13 @@ float vertices[] = {
 
 
 float quadVertices[] = {
-	-1.f, -1.f,  0.4f,0.4f,  // Vertex 1 (X, Y)
-	 1.f, -1.f,  0.6f,0.4f,  // Vertex 2 (X, Y)
-	 1.f,  1.f, 0.6f,0.6f,  // Vertex 3 (X, Y)
+	-1.f, -1.f,  0.f,0.f,  // Vertex 1 (X, Y)
+	 1.f, -1.f,  1.f,0.f,  // Vertex 2 (X, Y)
+	 1.f,  1.f, 1.f,1.f,  // Vertex 3 (X, Y)
 
-	 1.f,  1.f, 0.6f,0.6f,  // Vertex 3 (X, Y)
-	-1.f,  1.f,  0.4f,0.6f,  // Vertex 4 (X, Y)
-	-1.f, -1.f,  0.4f,0.4f  // Vertex 1 (X, Y)
+	 1.f,  1.f, 1.f,1.f,  // Vertex 3 (X, Y)
+	-1.f,  1.f,  0.f,1.f,  // Vertex 4 (X, Y)
+	-1.f, -1.f,  0.f,0.f  // Vertex 1 (X, Y)
 };
 
 
@@ -317,13 +317,19 @@ int main(int argc, const char** argv)
 	Mat screencontent_(real_canvas_height,real_canvas_width, CV_8UC3);
 	Mat screencontent_mask(real_canvas_height,real_canvas_width, CV_8UC3);
 
-	#define RINGBUF_SIZE 10
+	#define RINGBUF_SIZE 4
 	ModuloRingbuffer ringbuf_x(RINGBUF_SIZE, -virtual_canvas_width/2, virtual_canvas_width/2);
 	Ringbuffer ringbuf_y(RINGBUF_SIZE);
 	ModuloRingbuffer ringbuf_a(RINGBUF_SIZE, -180,180);
 	ModuloRingbuffer ringbuf_phi(RINGBUF_SIZE, -180,180);
 	ModuloRingbuffer ringbuf_psi(RINGBUF_SIZE, -180,180);
 	ModuloRingbuffer ringbuf_theta(RINGBUF_SIZE, -180,180);
+
+
+	#define DELAY_SIZE 6
+	Ringbuffer delay_phi(DELAY_SIZE);   // should delay sensor data by ~0.2sec
+	Ringbuffer delay_psi(DELAY_SIZE);   // that's the amount the video lags behind
+	Ringbuffer delay_theta(DELAY_SIZE); // the sensor data
 
 
 	for (int i=0; i<400;i++)
@@ -333,9 +339,22 @@ int main(int argc, const char** argv)
 		cvtColor(frame, oldgray, COLOR_BGR2GRAY);
 	}
 
-	while (waitKey(1) != 'x')
+	char key;
+	int adjust_phi=0;
+	while ((key=waitKey(1)) != 'x')
 	{
 		drone.get(frame_, &navdata);
+		delay_phi.put(navdata.phi);
+		delay_psi.put(navdata.psi);
+		delay_theta.put(navdata.theta);
+		navdata.phi = delay_phi.front();
+		navdata.psi = delay_psi.front();
+		navdata.theta = delay_theta.front();
+
+		navdata.phi = fixup_angle(navdata.phi + adjust_phi);
+
+		if (key=='q') adjust_phi++;
+		if (key=='w') adjust_phi--;
 		
 		//for (int i=0; i<1280; i+=50) frame_.col(i)=Scalar(0,255,255);
 		//for (int i=0; i<720; i+=50) frame_.row(i)=Scalar(0,255,255);
@@ -367,8 +386,8 @@ int main(int argc, const char** argv)
 			printf("no mat!\n");
 		}
 
-		total_x += shift_x;
-		total_y += shift_y;
+		total_x +=  cos(total_rot*PI/180.)*shift_x + sin(total_rot*PI/180.)*shift_y;
+		total_y += -sin(total_rot*PI/180.)*shift_x + cos(total_rot*PI/180.)*shift_y;
 		total_rot = fixup_angle(total_rot+angle);
 
 		ringbuf_x.put(total_x);
@@ -386,16 +405,19 @@ int main(int argc, const char** argv)
 		//if (fabs(ydiff) < px_per_deg) ydiff = 0.0;
 		//if (fabs(adiff) < 2) adiff = 0.0;
 
-		xdiff*=0.0;
-		ydiff*=0.0;
-		adiff*=0.1;
+		xdiff*=0.5;
+		ydiff*=0.5;
+		adiff*=0.5;
 		total_x = fixup_range(total_x - xdiff, -virtual_canvas_width/2, virtual_canvas_width/2);
 		total_y = total_y - ydiff;
 		total_rot = fixup_angle(total_rot - adiff);
 		ringbuf_x.add(-xdiff);
 		ringbuf_y.add(-ydiff);
 		ringbuf_a.add(-adiff);
-
+		
+		//total_x = navdata.psi * px_per_deg;
+		//total_y = - navdata.theta * px_per_deg;
+		//total_rot = -navdata.phi;
 
 
 

@@ -1,4 +1,4 @@
-client2: client2.cpp lib.cpp
+client2: client2.cpp lib.cpp ringbuf.h
 	g++ -std=c++11 -g client2.cpp lib.cpp -lglfw -lGLEW -lGLU -lGL `pkg-config --libs opencv` -lm  -o client2
 client: client.c
 	gcc client.c -lX11 -lXi -lXmu -lglut -lGL -lGLU -lm  -o client

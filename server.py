@@ -27,7 +27,8 @@ class ServerThread(threading.Thread):
             # Wait for a connection
             print >>sys.stderr, 'waiting for a connection'
             connection, client_address = sock.accept()
-            try:
+            #try:
+            if True:
                 print >>sys.stderr, 'connection from', client_address
 
                 while True:
@@ -36,7 +37,7 @@ class ServerThread(threading.Thread):
                         if data=="get\n":
                             lock.acquire()
                             framestr = global_frame.tostring()
-                            lenframestr=len(global_framestr)
+                            lenframestr=len(framestr)
                             connection.sendall(struct.pack(">i",lenframestr)+framestr+struct.pack("@dddd", global_phi, global_theta, global_psi, global_batt));
                             lock.release()
                         elif data[0:3] == "fly" and data[-1]=="\n":
@@ -51,9 +52,9 @@ class ServerThread(threading.Thread):
                     else:
                         print >>sys.stderr, 'no more data from', client_address
                         break
-            except:
-                print "Dingens!!11!1!!!"
-            finally:
+            #except:
+            #    print "Dingens!!11!1!!!"
+            #finally:
                 # Clean up the connection
                 connection.close()
 
