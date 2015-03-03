@@ -269,6 +269,22 @@ void calc_undistort_maps(float px_per_deg, int width, int height, Mat& map1, Mat
 	initUndistortRectifyMap(camera_matrix, dist_coeffs, Mat(), camera_matrix2, Size(width,height), CV_32FC1, map1, map2);
 }
 
+void genFramebuffer(GLuint& frameBuffer, GLuint& texColorBuffer, int w, int h)
+{
+	glGenFramebuffers(1, &frameBuffer);
+	glBindFramebuffer(GL_FRAMEBUFFER, frameBuffer);
+	
+	glGenTextures(1, &texColorBuffer);
+	glBindTexture(GL_TEXTURE_2D, texColorBuffer);
+
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, w, h, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
+
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texColorBuffer, 0);
+}
+
 int main(int argc, const char** argv)
 {
 
@@ -313,21 +329,8 @@ int main(int argc, const char** argv)
 
 
 // Framebuffer stuff
-	GLuint frameBuffer;
-	glGenFramebuffers(1, &frameBuffer);
-	glBindFramebuffer(GL_FRAMEBUFFER, frameBuffer);
-	
-	GLuint texColorBuffer;
-	glGenTextures(1, &texColorBuffer);
-	glBindTexture(GL_TEXTURE_2D, texColorBuffer);
-
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, CANVAS_WIDTH, CANVAS_HEIGHT, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
-
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-
-	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texColorBuffer, 0);
-
+	GLuint canvasFB, canvasTex;
+	genFramebuffer(canvasFB, canvasTex, CANVAS_WIDTH, CANVAS_HEIGHT);
 
 
 
@@ -496,7 +499,7 @@ int main(int argc, const char** argv)
 		glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
 
 
-		glBindFramebuffer(GL_FRAMEBUFFER, frameBuffer);
+		glBindFramebuffer(GL_FRAMEBUFFER, canvasFB);
 		glViewport(0,0,CANVAS_WIDTH,CANVAS_HEIGHT);
 		glBindVertexArray(vaoCanvas);
 		glUseProgram(shaderProgram);
@@ -510,7 +513,7 @@ int main(int argc, const char** argv)
 		glBindVertexArray(vaoQuad);
 		glUseProgram(quadShaderProgram);
 		glActiveTexture(GL_TEXTURE0);
-		glBindTexture(GL_TEXTURE_2D, texColorBuffer);
+		glBindTexture(GL_TEXTURE_2D, canvasTex);
 		glDrawArrays(GL_TRIANGLES, 0, 6);
 
 
