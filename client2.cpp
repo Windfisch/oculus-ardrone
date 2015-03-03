@@ -24,15 +24,14 @@ using namespace cv;
 #define PX_PER_DEG 16.0
 
 
-#define PX_PER_DEG_WINDOWSIZE 3
 #define PX_PER_DEG_CANVAS 16
 #define CANVAS_XDEG 450
 #define CANVAS_YDEG 120
 #define CANVAS_WIDTH  CANVAS_XDEG*PX_PER_DEG_CANVAS
 #define CANVAS_HEIGHT CANVAS_YDEG*PX_PER_DEG_CANVAS
-#define SCREEN_WIDTH  CANVAS_XDEG*PX_PER_DEG_WINDOWSIZE
-#define SCREEN_HEIGHT CANVAS_YDEG*PX_PER_DEG_WINDOWSIZE
-
+#define SCREEN_WIDTH  (1920/2)
+#define SCREEN_HEIGHT (1080/2)
+#define SCREEN_XDEG 60
 
 
 const char* justDrawASpriteVertexSource =
@@ -54,6 +53,16 @@ const char* justDrawASpriteFragmentSource =
 	"void main()\n"
 	"{\n"
 	"	outColor = texture(texVideo, Texcoord);\n"
+	"}\n";
+
+const char* justDrawASpriteFragmentOculusSource =
+	"#version 150\n"
+	"uniform sampler2D texVideo;\n"
+	"in vec2 Texcoord;\n"
+	"out vec4 outColor;\n"
+	"void main()\n"
+	"{\n"
+	"	outColor = texture(texVideo, Texcoord)*1.5;\n"
 	"}\n";
 
 const char* justDrawASpriteFragmentSourceGray =
@@ -107,6 +116,25 @@ void calcVerticesRotated(int xshift, int yshift, float angle, float* v)
 	v[17]=(float) (-pt.y + yshift) / PX_PER_DEG / CANVAS_YDEG * 2;
 }
 
+void calcVerticesRotated2(float xshift, float yshift, float angle, float* v)
+{
+	v+=2;
+	Point2f pt;
+	float xd = SCREEN_XDEG;
+	float yd = -SCREEN_XDEG * SCREEN_HEIGHT / SCREEN_WIDTH;
+	pt = Point2f( -cos(angle)*xd/2 + sin(angle)*yd/2, +sin(angle)*xd/2 + cos(angle)*yd/2 );
+	v[0]=v[20]=(float) ( pt.x + xshift) / CANVAS_XDEG + 0.5;
+	v[1]=v[21]=(float) ( pt.y + yshift) / CANVAS_YDEG + 0.5;
+	v[8]=v[12]=(float) (-pt.x + xshift) / CANVAS_XDEG + 0.5;
+	v[9]=v[13]=(float) (-pt.y + yshift) / CANVAS_YDEG + 0.5;
+
+	pt = Point2f( cos(angle)*xd/2 + sin(angle)*yd/2, -sin(angle)*xd/2 + cos(angle)*yd/2 );
+	v[4] =(float) ( pt.x + xshift) / CANVAS_XDEG + 0.5;
+	v[5] =(float) ( pt.y + yshift) / CANVAS_YDEG + 0.5;
+	v[16]=(float) (-pt.x + xshift) / CANVAS_XDEG + 0.5;
+	v[17]=(float) (-pt.y + yshift) / CANVAS_YDEG + 0.5;
+}
+
 
 void compileShaderProgram(const GLchar* vertSrc, const GLchar* fragSrc, GLuint& vertexShader, GLuint& fragmentShader, GLuint& shaderProgram)
 {
@@ -139,6 +167,28 @@ GLuint justDrawASpriteShaderProgram(GLuint vao, GLuint vbo, bool gray=false)
 {
 	GLuint vertexShader, fragmentShader, shaderProgram;
 	compileShaderProgram(justDrawASpriteVertexSource, gray? justDrawASpriteFragmentSourceGray : justDrawASpriteFragmentSource, vertexShader, fragmentShader, shaderProgram);
+
+
+	glBindVertexArray(vao);
+	glBindBuffer(GL_ARRAY_BUFFER, vbo);
+	
+	// set up shaders
+	GLint posAttrib = glGetAttribLocation(shaderProgram, "position");
+	glEnableVertexAttribArray(posAttrib);
+	glVertexAttribPointer(posAttrib, 2, GL_FLOAT, GL_FALSE, 4*sizeof(float), 0);
+
+
+	GLint texAttrib = glGetAttribLocation(shaderProgram, "texcoord");
+	glEnableVertexAttribArray(texAttrib);
+	glVertexAttribPointer(texAttrib, 2, GL_FLOAT, GL_FALSE, 4*sizeof(float), (void*)(2*sizeof(float)));
+
+	return shaderProgram;
+}
+
+GLuint justDrawASpriteShaderProgramOculus(GLuint vao, GLuint vbo)
+{
+	GLuint vertexShader, fragmentShader, shaderProgram;
+	compileShaderProgram(justDrawASpriteVertexSource, justDrawASpriteFragmentOculusSource, vertexShader, fragmentShader, shaderProgram);
 
 
 	glBindVertexArray(vao);
@@ -248,7 +298,7 @@ int main(int argc, const char** argv)
 	
 	// compile shaders
 	GLuint shaderProgram = justDrawASpriteShaderProgram(vaoCanvas, vboCanvas);
-	GLuint quadShaderProgram = justDrawASpriteShaderProgram(vaoQuad, vboQuad);
+	GLuint quadShaderProgram = justDrawASpriteShaderProgramOculus(vaoQuad, vboQuad);
 
 
 	// texture
@@ -323,6 +373,7 @@ int main(int argc, const char** argv)
 	ModuloRingbuffer ringbuf_a(RINGBUF_SIZE, -180,180);
 	ModuloRingbuffer ringbuf_phi(RINGBUF_SIZE, -180,180);
 	ModuloRingbuffer ringbuf_psi(RINGBUF_SIZE, -180,180);
+	ModuloRingbuffer ringbuf_psi2(40, -180,180);
 	ModuloRingbuffer ringbuf_theta(RINGBUF_SIZE, -180,180);
 
 
@@ -395,6 +446,7 @@ int main(int argc, const char** argv)
 		ringbuf_a.put(total_rot);
 		ringbuf_phi.put(navdata.phi);
 		ringbuf_psi.put(navdata.psi);
+		ringbuf_psi2.put(navdata.psi);
 		ringbuf_theta.put(navdata.theta);
 
 		double xdiff = fixup_range( ringbuf_x.get() - px_per_deg*ringbuf_psi.get(), -virtual_canvas_width/2, virtual_canvas_width/2);
@@ -436,7 +488,10 @@ int main(int argc, const char** argv)
 
 
 		calcVerticesRotated(total_x, -total_y,-total_rot*PI/180.,vertices);
+		calcVerticesRotated2(ringbuf_psi2.get(),10,0,quadVertices);
 
+		glBindBuffer(GL_ARRAY_BUFFER, vboQuad);
+		glBufferData(GL_ARRAY_BUFFER, sizeof(quadVertices), quadVertices, GL_STATIC_DRAW);
 		glBindBuffer(GL_ARRAY_BUFFER, vboCanvas);
 		glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
 
