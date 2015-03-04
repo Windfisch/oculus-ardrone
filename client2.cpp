@@ -31,7 +31,9 @@ using namespace cv;
 #define CANVAS_HEIGHT CANVAS_YDEG*PX_PER_DEG_CANVAS
 #define SCREEN_WIDTH  (1920/2)
 #define SCREEN_HEIGHT (1080/2)
-#define SCREEN_XDEG 60
+#define EYE_WIDTH (SCREEN_WIDTH/2)
+#define EYE_HEIGHT SCREEN_HEIGHT
+#define EYE_XDEG 30
 
 
 const char* justDrawASpriteVertexSource =
@@ -55,14 +57,24 @@ const char* justDrawASpriteFragmentSource =
 	"	outColor = texture(texVideo, Texcoord);\n"
 	"}\n";
 
-const char* justDrawASpriteFragmentOculusSource =
+const char* oculusVertexSource =
+	"#version 150\n"
+	"in vec2 position;\n"
+	"out vec2 Screencoord;\n"
+	"void main()\n"
+	"{\n"
+	"	gl_Position = vec4(position, 0.0, 1.0);\n"
+	"	Screencoord = position;\n"
+	"}\n";
+const char* oculusFragmentSource =
 	"#version 150\n"
 	"uniform sampler2D texVideo;\n"
-	"in vec2 Texcoord;\n"
+	"in vec2 Screencoord;\n"
 	"out vec4 outColor;\n"
 	"void main()\n"
 	"{\n"
-	"	outColor = texture(texVideo, Texcoord)*1.5;\n"
+	"	float x =  Screencoord.x > 0? Screencoord.x : (Screencoord.x+1);\n"
+	"	outColor = texture(texVideo, vec2(x,((Screencoord.y+1)/2)));\n"
 	"}\n";
 
 const char* justDrawASpriteFragmentSourceGray =
@@ -88,6 +100,15 @@ float vertices[] = {
 	-1.f,  1.f,  0.0f,0.0f  // Vertex 1 (X, Y)
 };
 
+float wholescreenVertices[] = {
+	-1.f, -1.f,  // Vertex 1 (X, Y)
+	 1.f, -1.f,  // Vertex 2 (X, Y)
+	 1.f,  1.f,  // Vertex 3 (X, Y)
+
+	 1.f,  1.f,  // Vertex 3 (X, Y)
+	-1.f,  1.f,  // Vertex 4 (X, Y)
+	-1.f, -1.f   // Vertex 1 (X, Y)
+};
 
 float quadVertices[] = {
 	-1.f, -1.f,  0.f,0.f,  // Vertex 1 (X, Y)
@@ -120,8 +141,8 @@ void calcVerticesRotated2(float xshift, float yshift, float angle, float* v)
 {
 	v+=2;
 	Point2f pt;
-	float xd = SCREEN_XDEG;
-	float yd = -SCREEN_XDEG * SCREEN_HEIGHT / SCREEN_WIDTH;
+	float xd = EYE_XDEG;
+	float yd = -EYE_XDEG * EYE_HEIGHT / EYE_WIDTH;
 	pt = Point2f( -cos(angle)*xd/2 + sin(angle)*yd/2, +sin(angle)*xd/2 + cos(angle)*yd/2 );
 	v[0]=v[20]=(float) ( pt.x + xshift) / CANVAS_XDEG + 0.5;
 	v[1]=v[21]=(float) ( pt.y + yshift) / CANVAS_YDEG + 0.5;
@@ -185,10 +206,10 @@ GLuint justDrawASpriteShaderProgram(GLuint vao, GLuint vbo, bool gray=false)
 	return shaderProgram;
 }
 
-GLuint justDrawASpriteShaderProgramOculus(GLuint vao, GLuint vbo)
+GLuint newOculusShaderProgram(GLuint vao, GLuint vbo)
 {
 	GLuint vertexShader, fragmentShader, shaderProgram;
-	compileShaderProgram(justDrawASpriteVertexSource, justDrawASpriteFragmentOculusSource, vertexShader, fragmentShader, shaderProgram);
+	compileShaderProgram(oculusVertexSource, oculusFragmentSource, vertexShader, fragmentShader, shaderProgram);
 
 
 	glBindVertexArray(vao);
@@ -197,12 +218,8 @@ GLuint justDrawASpriteShaderProgramOculus(GLuint vao, GLuint vbo)
 	// set up shaders
 	GLint posAttrib = glGetAttribLocation(shaderProgram, "position");
 	glEnableVertexAttribArray(posAttrib);
-	glVertexAttribPointer(posAttrib, 2, GL_FLOAT, GL_FALSE, 4*sizeof(float), 0);
+	glVertexAttribPointer(posAttrib, 2, GL_FLOAT, GL_FALSE, 2*sizeof(float), 0);
 
-
-	GLint texAttrib = glGetAttribLocation(shaderProgram, "texcoord");
-	glEnableVertexAttribArray(texAttrib);
-	glVertexAttribPointer(texAttrib, 2, GL_FLOAT, GL_FALSE, 4*sizeof(float), (void*)(2*sizeof(float)));
 
 	return shaderProgram;
 }
@@ -291,14 +308,16 @@ int main(int argc, const char** argv)
 	GLFWwindow* window = initOpenGL();
 
 
-	GLuint vaoCanvas, vaoQuad;
+	GLuint vaoCanvas, vaoQuad, vaoWholescreenQuad;
 	glGenVertexArrays(1, &vaoCanvas);
 	glGenVertexArrays(1, &vaoQuad);
+	glGenVertexArrays(1, &vaoWholescreenQuad);
 
 
-	GLuint vboCanvas, vboQuad;
+	GLuint vboCanvas, vboQuad, vboWholescreenQuad;
 	glGenBuffers(1, &vboCanvas);
 	glGenBuffers(1, &vboQuad);
+	glGenBuffers(1, &vboWholescreenQuad);
 
 	calcVerticesRotated(0,0,PI/2,vertices);
 
@@ -308,13 +327,17 @@ int main(int argc, const char** argv)
 	glBindBuffer(GL_ARRAY_BUFFER, vboQuad);
 	glBufferData(GL_ARRAY_BUFFER, sizeof(quadVertices), quadVertices, GL_STATIC_DRAW);
 
+	glBindBuffer(GL_ARRAY_BUFFER, vboWholescreenQuad);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(wholescreenVertices), wholescreenVertices, GL_STATIC_DRAW);
+
 
 
 
 	
 	// compile shaders
 	GLuint shaderProgram = justDrawASpriteShaderProgram(vaoCanvas, vboCanvas);
-	GLuint quadShaderProgram = justDrawASpriteShaderProgramOculus(vaoQuad, vboQuad);
+	GLuint quadShaderProgram = justDrawASpriteShaderProgram(vaoQuad, vboQuad);
+	GLuint oculusShaderProgram = newOculusShaderProgram(vaoWholescreenQuad, vboWholescreenQuad);
 
 
 	// texture
@@ -331,6 +354,9 @@ int main(int argc, const char** argv)
 // Framebuffer stuff
 	GLuint canvasFB, canvasTex;
 	genFramebuffer(canvasFB, canvasTex, CANVAS_WIDTH, CANVAS_HEIGHT);
+
+	GLuint eyeFB, eyeTex;
+	genFramebuffer(eyeFB, eyeTex, EYE_WIDTH, EYE_HEIGHT);
 
 
 
@@ -508,12 +534,21 @@ int main(int argc, const char** argv)
 		glDrawArrays(GL_TRIANGLES, 0, 6);
 
 
-		glBindFramebuffer(GL_FRAMEBUFFER, 0);
-		glViewport(0,0,SCREEN_WIDTH,SCREEN_HEIGHT);
+		glBindFramebuffer(GL_FRAMEBUFFER, eyeFB);
+		glViewport(0,0,EYE_WIDTH,EYE_HEIGHT);
 		glBindVertexArray(vaoQuad);
 		glUseProgram(quadShaderProgram);
 		glActiveTexture(GL_TEXTURE0);
 		glBindTexture(GL_TEXTURE_2D, canvasTex);
+		glDrawArrays(GL_TRIANGLES, 0, 6);
+
+
+		glBindFramebuffer(GL_FRAMEBUFFER, 0);
+		glViewport(0,0,SCREEN_WIDTH, SCREEN_HEIGHT);
+		glBindVertexArray(vaoWholescreenQuad);
+		glUseProgram(oculusShaderProgram);
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(GL_TEXTURE_2D, eyeTex);
 		glDrawArrays(GL_TRIANGLES, 0, 6);
 
 
