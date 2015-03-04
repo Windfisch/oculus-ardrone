@@ -75,8 +75,10 @@ const char* oculusFragmentSource =
 	"const vec2 RightLensCenter = vec2(-0.2, 0.);\n"
 	//"const vec4 HmdWarpParam   = vec4(1, 0, 0, 0);\n"
 	"const vec4 HmdWarpParam   = vec4(1, 0.2, 0.1, 0);\n"
-	"const float aberr_r = 0.985;\n"
-	"const float aberr_b = 1.015;\n"
+	"const float aberr_r = 0.97;\n"
+	"const float aberr_b = 1.03;\n"
+//	"const float aberr_r = 0.985;\n"
+//	"const float aberr_b = 1.015;\n"
 	"void main()\n"
 	"{\n"
 	"	vec2 LensCenter = Screencoord.x < 0 ? LeftLensCenter : RightLensCenter;\n"
@@ -86,8 +88,14 @@ const char* oculusFragmentSource =
 	"	float rSq = theta.x*theta.x+theta.y*theta.y;\n"
 	"	vec2 rvector = theta * (HmdWarpParam.x + HmdWarpParam.y * rSq +"
 	"		HmdWarpParam.z * rSq * rSq + HmdWarpParam.w * rSq * rSq * rSq);\n"
-	"	vec2 loc = rvector + LensCenter;\n"
-	"	outColor = texture(texVideo, vec2(loc)/vec2(2,2)+vec2(0.5,0.5));\n"
+	"	vec2 loc_r = (aberr_r * rvector + LensCenter)/vec2(2,2)+vec2(0.5,0.5);\n"
+	"	vec2 loc_g = (      1 * rvector + LensCenter)/vec2(2,2)+vec2(0.5,0.5);\n"
+	"	vec2 loc_b = (aberr_b * rvector + LensCenter)/vec2(2,2)+vec2(0.5,0.5);\n"
+	"\n"
+	"	float rval = texture(texVideo, loc_r).b;\n"
+	"	float gval = texture(texVideo, loc_g).g;\n"
+	"	float bval = texture(texVideo, loc_b).r;\n"
+	"	outColor = vec4(rval,gval,bval,1.0);\n"
 	"}\n";
 
 const char* justDrawASpriteFragmentSourceGray =
@@ -435,7 +443,7 @@ int main(int argc, const char** argv)
 	}
 
 	char key;
-	int adjust_phi=0;
+	int adjust_phi=10;
 	while ((key=waitKey(1)) != 'x')
 	{
 		drone.get(frame_, &navdata);
