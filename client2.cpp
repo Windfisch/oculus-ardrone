@@ -71,10 +71,23 @@ const char* oculusFragmentSource =
 	"uniform sampler2D texVideo;\n"
 	"in vec2 Screencoord;\n"
 	"out vec4 outColor;\n"
+	"const vec2 LeftLensCenter = vec2(0.2, 0.);\n"
+	"const vec2 RightLensCenter = vec2(-0.2, 0.);\n"
+	//"const vec4 HmdWarpParam   = vec4(1, 0, 0, 0);\n"
+	"const vec4 HmdWarpParam   = vec4(1, 0.2, 0.1, 0);\n"
+	"const float aberr_r = 0.985;\n"
+	"const float aberr_b = 1.015;\n"
 	"void main()\n"
 	"{\n"
-	"	float x =  Screencoord.x > 0? Screencoord.x : (Screencoord.x+1);\n"
-	"	outColor = texture(texVideo, vec2(x,((Screencoord.y+1)/2)));\n"
+	"	vec2 LensCenter = Screencoord.x < 0 ? LeftLensCenter : RightLensCenter;\n"
+	"	float x = (Screencoord.x > 0? Screencoord.x : (Screencoord.x+1))*2 -1;\n" // between -1 and 1
+	"	float y = (Screencoord.y);\n"
+	"	vec2 theta = (vec2(x,y) - LensCenter);\n"
+	"	float rSq = theta.x*theta.x+theta.y*theta.y;\n"
+	"	vec2 rvector = theta * (HmdWarpParam.x + HmdWarpParam.y * rSq +"
+	"		HmdWarpParam.z * rSq * rSq + HmdWarpParam.w * rSq * rSq * rSq);\n"
+	"	vec2 loc = rvector + LensCenter;\n"
+	"	outColor = texture(texVideo, vec2(loc)/vec2(2,2)+vec2(0.5,0.5));\n"
 	"}\n";
 
 const char* justDrawASpriteFragmentSourceGray =
@@ -286,7 +299,7 @@ void calc_undistort_maps(float px_per_deg, int width, int height, Mat& map1, Mat
 	initUndistortRectifyMap(camera_matrix, dist_coeffs, Mat(), camera_matrix2, Size(width,height), CV_32FC1, map1, map2);
 }
 
-void genFramebuffer(GLuint& frameBuffer, GLuint& texColorBuffer, int w, int h)
+void genFramebuffer(GLuint& frameBuffer, GLuint& texColorBuffer, int w, int h, bool wrap)
 {
 	glGenFramebuffers(1, &frameBuffer);
 	glBindFramebuffer(GL_FRAMEBUFFER, frameBuffer);
@@ -296,6 +309,8 @@ void genFramebuffer(GLuint& frameBuffer, GLuint& texColorBuffer, int w, int h)
 
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, w, h, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
 
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, wrap?GL_REPEAT:GL_CLAMP_TO_BORDER);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, wrap?GL_REPEAT:GL_CLAMP_TO_BORDER);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
@@ -353,10 +368,10 @@ int main(int argc, const char** argv)
 
 // Framebuffer stuff
 	GLuint canvasFB, canvasTex;
-	genFramebuffer(canvasFB, canvasTex, CANVAS_WIDTH, CANVAS_HEIGHT);
+	genFramebuffer(canvasFB, canvasTex, CANVAS_WIDTH, CANVAS_HEIGHT, true);
 
 	GLuint eyeFB, eyeTex;
-	genFramebuffer(eyeFB, eyeTex, EYE_WIDTH, EYE_HEIGHT);
+	genFramebuffer(eyeFB, eyeTex, EYE_WIDTH, EYE_HEIGHT, false);
 
 
 
