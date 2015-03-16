@@ -47,6 +47,47 @@ const char* justDrawASpriteVertexSource =
 	"	Texcoord = texcoord;\n"
 	"}\n";
 
+
+//(1*tan(oeffnungswinkel/2) , 0 , 1) soll auf (XRES, YRES/2) mappen
+
+//M*p = (alphax*tan(w/2)+XRES/2, YRES/2, 1)
+//also XRES/2 / tan(w/2) = alphax
+
+const char* drawOnCanvasFragmentSource =
+	"#version 150\n"
+	"uniform sampler2D texVideo;\n"
+	"uniform float cam_yaw;\n"
+	"uniform float cam_pitch;\n"
+	"uniform float cam_roll;\n"
+	"const float CAM_XRES=1280;\n"
+	"const float CAM_YRES=720;\n"
+	"const float CAM_XDEG=82/180.*3.141592654;\n"
+	"const float CAM_FX=CAM_XRES/2.0 / tan(CAM_XDEG/2.0);\n"
+	//"const float CAM_FX=1;\n"
+	"const mat3 cam_cal = transpose(mat3(CAM_FX, 0, CAM_XRES/2,    0, CAM_FX, CAM_YRES/2,     0,0,1));\n"
+	"const mat3 math_to_opencv = transpose(mat3(0,1,0,   0,0,1,   -1,0,0));\n"
+	"in vec2 Texcoord;\n"
+	"out vec4 outColor;\n"
+	"void main()\n"
+	"{\n"
+	"	// cam_rot rotates a pixel FROM world TO cam frame\n"
+	"	// mat3 cam_rot = transpose(mat3(1,0,0,  0,cos(cam_roll),sin(cam_roll), 0,-sin(cam_roll),cos(cam_roll))) * transpose(mat3(cos(cam_pitch),0,-sin(cam_pitch), 0,1,0, sin(cam_pitch),0,cos(cam_pitch))) * transpose(mat3(cos(cam_yaw),sin(cam_yaw),0,-sin(cam_yaw),cos(cam_yaw),0,0,0,1));\n"
+	"	mat3 cam_rot = transpose(mat3(1,0,0,  0,1,0,  0,0,1));\n"
+	"	// Texcoord.xy is yaw/pitch in the unit sphere\n"
+	"	vec3 point_in_world_frame = vec3( cos(Texcoord.x)*cos(Texcoord.y), sin(Texcoord.x)*cos(Texcoord.y), -sin(Texcoord.y) );\n"
+//	"	if ((0.2< abs(point_in_world_frame.z)) && (abs(point_in_world_frame.z) < 0.3)) outColor=vec4(1,1,1,1); else outColor=vec4(0,0,0,1); return;"
+	"	vec3 point_in_cam_frame = cam_rot * point_in_world_frame;\n"
+	"	vec3 point_in_cam_pic_uniform = cam_cal * math_to_opencv * point_in_cam_frame;\n"
+	"	vec2 point_in_cam_pic = point_in_cam_pic_uniform.xy / point_in_cam_pic_uniform.z;\n"
+	"	if ( point_in_cam_pic_uniform.z < 0 && \n"
+	"	     (0 <= point_in_cam_pic.x && point_in_cam_pic.x < CAM_XRES) && \n"
+	"	     (0 <= point_in_cam_pic.y && point_in_cam_pic.y < CAM_YRES) ) \n"
+	"		outColor = texture(texVideo, vec2(1.0,1.0)-point_in_cam_pic/vec2(CAM_XRES,CAM_YRES));\n"
+	//"		outColor = vec4(point_in_cam_pic/vec2(CAM_XRES,CAM_YRES),-point_in_cam_pic_uniform.z/1000,1);\n"
+	"	else\n"
+	"		outColor = vec4(1.0,0.0,1.0,0.1);"
+	"}\n";
+
 const char* justDrawASpriteFragmentSource =
 	"#version 150\n"
 	"uniform sampler2D texVideo;\n"
@@ -121,13 +162,13 @@ const char* justDrawASpriteFragmentSourceGray =
 
 
 float vertices[] = {
-	-1.f,  1.f,  0.0f,0.0f,  // Vertex 1 (X, Y)
-	 1.f,  1.f,  1.0f,0.0f,  // Vertex 2 (X, Y)
-	 1.f, -1.f, 1.0f,1.0f,  // Vertex 3 (X, Y)
+	-1.f,  1.f,  -PI,PI/2,  // Vertex 1 (X, Y)
+	 1.f,  1.f,  PI,PI/2,  // Vertex 2 (X, Y)
+	 1.f, -1.f, PI,-PI/2,  // Vertex 3 (X, Y)
 
-	 1.f, -1.f, 1.0f,1.0f,  // Vertex 3 (X, Y)
-	-1.f, -1.f,  0.0f,1.0f,  // Vertex 4 (X, Y)
-	-1.f,  1.f,  0.0f,0.0f  // Vertex 1 (X, Y)
+	 1.f, -1.f, PI,-PI/2,  // Vertex 3 (X, Y)
+	-1.f, -1.f,  -PI,-PI/2,  // Vertex 4 (X, Y)
+	-1.f,  1.f,  -PI,PI/2  // Vertex 1 (X, Y)
 };
 
 float wholescreenVertices[] = {
@@ -212,6 +253,28 @@ void compileShaderProgram(const GLchar* vertSrc, const GLchar* fragSrc, GLuint& 
 	glAttachShader(shaderProgram, fragmentShader);
 	glBindFragDataLocation(shaderProgram, 0, "outColor"); // not neccessary
 	glLinkProgram(shaderProgram);
+}
+
+GLuint newCanvasShaderProgram(GLuint vao, GLuint vbo)
+{
+	GLuint vertexShader, fragmentShader, shaderProgram;
+	compileShaderProgram(justDrawASpriteVertexSource, drawOnCanvasFragmentSource, vertexShader, fragmentShader, shaderProgram);
+
+
+	glBindVertexArray(vao);
+	glBindBuffer(GL_ARRAY_BUFFER, vbo);
+	
+	// set up shaders
+	GLint posAttrib = glGetAttribLocation(shaderProgram, "position");
+	glEnableVertexAttribArray(posAttrib);
+	glVertexAttribPointer(posAttrib, 2, GL_FLOAT, GL_FALSE, 4*sizeof(float), 0);
+
+
+	GLint texAttrib = glGetAttribLocation(shaderProgram, "texcoord");
+	glEnableVertexAttribArray(texAttrib);
+	glVertexAttribPointer(texAttrib, 2, GL_FLOAT, GL_FALSE, 4*sizeof(float), (void*)(2*sizeof(float)));
+
+	return shaderProgram;
 }
 
 GLuint justDrawASpriteShaderProgram(GLuint vao, GLuint vbo, bool gray=false)
@@ -351,8 +414,6 @@ int main(int argc, const char** argv)
 	glGenBuffers(1, &vboQuad);
 	glGenBuffers(1, &vboWholescreenQuad);
 
-	calcVerticesRotated(0,0,PI/2,vertices);
-
 	glBindBuffer(GL_ARRAY_BUFFER, vboCanvas);
 	glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
 
@@ -370,6 +431,7 @@ int main(int argc, const char** argv)
 	GLuint shaderProgram = justDrawASpriteShaderProgram(vaoCanvas, vboCanvas);
 	GLuint quadShaderProgram = justDrawASpriteShaderProgram(vaoQuad, vboQuad);
 	GLuint oculusShaderProgram = newOculusShaderProgram(vaoWholescreenQuad, vboWholescreenQuad);
+	GLuint drawOnCanvasProgram = newCanvasShaderProgram(vaoCanvas, vboCanvas);
 
 
 	// texture
@@ -396,7 +458,8 @@ int main(int argc, const char** argv)
 
 
 
-
+glEnable (GL_BLEND);
+glBlendFunc (GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
 
 
@@ -548,19 +611,16 @@ int main(int argc, const char** argv)
 		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, frame_gl.size().width, frame_gl.size().height, 0, GL_RGB, GL_UNSIGNED_BYTE, frame_gl.ptr<unsigned char>(0));
 
 
-		calcVerticesRotated(total_x, -total_y,-total_rot*PI/180.,vertices);
 		calcVerticesRotated2(ringbuf_psi2.get(),10,0,quadVertices);
 
 		glBindBuffer(GL_ARRAY_BUFFER, vboQuad);
 		glBufferData(GL_ARRAY_BUFFER, sizeof(quadVertices), quadVertices, GL_STATIC_DRAW);
-		glBindBuffer(GL_ARRAY_BUFFER, vboCanvas);
-		glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
 
 
 		glBindFramebuffer(GL_FRAMEBUFFER, canvasFB);
 		glViewport(0,0,CANVAS_WIDTH,CANVAS_HEIGHT);
 		glBindVertexArray(vaoCanvas);
-		glUseProgram(shaderProgram);
+		glUseProgram(drawOnCanvasProgram);
 		glActiveTexture(GL_TEXTURE0);
 		glBindTexture(GL_TEXTURE_2D, texVideo);
 		glDrawArrays(GL_TRIANGLES, 0, 6);
