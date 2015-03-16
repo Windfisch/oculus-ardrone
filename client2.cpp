@@ -61,7 +61,7 @@ const char* drawOnCanvasFragmentSource =
 	"uniform float cam_roll;\n"
 	"const float CAM_XRES=1280;\n"
 	"const float CAM_YRES=720;\n"
-	"const float CAM_XDEG=82/180.*3.141592654;\n"
+	"const float CAM_XDEG=70/180.*3.141592654;\n"
 	"const float CAM_FX=CAM_XRES/2.0 / tan(CAM_XDEG/2.0);\n"
 	//"const float CAM_FX=1;\n"
 	"const mat3 cam_cal = transpose(mat3(CAM_FX, 0, CAM_XRES/2,    0, CAM_FX, CAM_YRES/2,     0,0,1));\n"
@@ -71,8 +71,8 @@ const char* drawOnCanvasFragmentSource =
 	"void main()\n"
 	"{\n"
 	"	// cam_rot rotates a pixel FROM world TO cam frame\n"
-	"	// mat3 cam_rot = transpose(mat3(1,0,0,  0,cos(cam_roll),sin(cam_roll), 0,-sin(cam_roll),cos(cam_roll))) * transpose(mat3(cos(cam_pitch),0,-sin(cam_pitch), 0,1,0, sin(cam_pitch),0,cos(cam_pitch))) * transpose(mat3(cos(cam_yaw),sin(cam_yaw),0,-sin(cam_yaw),cos(cam_yaw),0,0,0,1));\n"
-	"	mat3 cam_rot = transpose(mat3(1,0,0,  0,1,0,  0,0,1));\n"
+	"	mat3 cam_rot = transpose(mat3(1,0,0,  0,cos(cam_roll),sin(cam_roll), 0,-sin(cam_roll),cos(cam_roll))) * transpose(mat3(cos(cam_pitch),0,-sin(cam_pitch), 0,1,0, sin(cam_pitch),0,cos(cam_pitch))) * transpose(mat3(cos(cam_yaw),sin(cam_yaw),0,-sin(cam_yaw),cos(cam_yaw),0,0,0,1));\n"
+//	"	mat3 cam_rot = transpose(mat3(1,0,0,  0,1,0,  0,0,1));\n"
 	"	// Texcoord.xy is yaw/pitch in the unit sphere\n"
 	"	vec3 point_in_world_frame = vec3( cos(Texcoord.x)*cos(Texcoord.y), sin(Texcoord.x)*cos(Texcoord.y), -sin(Texcoord.y) );\n"
 //	"	if ((0.2< abs(point_in_world_frame.z)) && (abs(point_in_world_frame.z) < 0.3)) outColor=vec4(1,1,1,1); else outColor=vec4(0,0,0,1); return;"
@@ -85,7 +85,7 @@ const char* drawOnCanvasFragmentSource =
 	"		outColor = texture(texVideo, vec2(1.0,1.0)-point_in_cam_pic/vec2(CAM_XRES,CAM_YRES));\n"
 	//"		outColor = vec4(point_in_cam_pic/vec2(CAM_XRES,CAM_YRES),-point_in_cam_pic_uniform.z/1000,1);\n"
 	"	else\n"
-	"		outColor = vec4(1.0,0.0,1.0,0.1);"
+	"		outColor = vec4(0.0,0.0,0.0,0.00);"
 	"}\n";
 
 const char* justDrawASpriteFragmentSource =
@@ -432,7 +432,9 @@ int main(int argc, const char** argv)
 	GLuint quadShaderProgram = justDrawASpriteShaderProgram(vaoQuad, vboQuad);
 	GLuint oculusShaderProgram = newOculusShaderProgram(vaoWholescreenQuad, vboWholescreenQuad);
 	GLuint drawOnCanvasProgram = newCanvasShaderProgram(vaoCanvas, vboCanvas);
-
+	GLint uniCamYaw = glGetUniformLocation(drawOnCanvasProgram, "cam_yaw");
+	GLint uniCamPitch = glGetUniformLocation(drawOnCanvasProgram, "cam_pitch");
+	GLint uniCamRoll = glGetUniformLocation(drawOnCanvasProgram, "cam_roll");
 
 	// texture
 	GLuint texVideo;
@@ -623,6 +625,10 @@ glBlendFunc (GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 		glUseProgram(drawOnCanvasProgram);
 		glActiveTexture(GL_TEXTURE0);
 		glBindTexture(GL_TEXTURE_2D, texVideo);
+
+	glUniform1f(uniCamYaw,(float)total_x/virtual_canvas_width*2*PI);
+	glUniform1f(uniCamPitch,-(float)total_y/px_per_deg/180.*PI);
+	glUniform1f(uniCamRoll,-total_rot/180.*PI);
 		glDrawArrays(GL_TRIANGLES, 0, 6);
 
 
