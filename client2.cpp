@@ -53,6 +53,7 @@ const char* justDrawASpriteVertexSource =
 //M*p = (alphax*tan(w/2)+XRES/2, YRES/2, 1)
 //also XRES/2 / tan(w/2) = alphax
 
+
 const char* drawOnCanvasFragmentSource =
 	"#version 150\n"
 	"uniform sampler2D texVideo;\n"
@@ -91,6 +92,38 @@ const char* drawOnCanvasFragmentSource =
 	//"		outColor = vec4(point_in_cam_pic/vec2(CAM_XRES,CAM_YRES),-point_in_cam_pic_uniform.z/1000,1);\n"
 	"	else\n"
 	"		outColor = vec4(0.0,0.0,0.0,0.00);"
+	"	float xxx = Texcoord.x/3.141592654*180/10+100;"
+	"	float yyy = Texcoord.y/3.141592654*180/10+100;"
+	"	if ( (abs(xxx- int(xxx)) < 0.1) || (abs(yyy- int(yyy)) <.1)) outColor = vec4(0.5,0.5,0.5,0.5);"
+	"}\n";
+
+
+const char* drawFromCanvasFragmentSource =
+	"#version 150\n"
+	"uniform sampler2D texVideo;\n"
+	"uniform float eye_yaw;\n"
+	"uniform float eye_pitch;\n"
+	"uniform float eye_roll;\n"
+	"const float aspect_ratio=1280./720.;\n"
+	"const float horiz_field_of_view=70/180.*3.141592654;\n"
+	"const float CAM_FX=1/2.0 / tan(horiz_field_of_view/2.0);\n"
+	"const mat3 eye_cal_inv = transpose(mat3(1/CAM_FX, 0, -1/2/CAM_FX,    0, 1/CAM_FX, -1/aspect_ratio/2/CAM_FX,     0,0,1));\n"
+	"const mat3 opencv_to_math = mat3(0,1,0,   0,0,1,   -1,0,0);\n"
+	"in vec2 Texcoord;\n"
+	"out vec4 outColor;\n"
+	"void main()\n"
+	"{\n"
+	//"	vec3 point_in_eye_frame = opencv_to_math * eye_cal_inv * vec3( Texcoord.x,  Texcoord.y/aspect_ratio, 1 );\n"
+	"	vec3 point_in_eye_frame = opencv_to_math *  vec3( vec2(Texcoord.x-0.5, (Texcoord.y-0.5)/aspect_ratio) /CAM_FX  , 1);"
+	"	// eye_rot_inv rotates a pixel FROM eye TO world frame\n"
+	"	mat3 eye_rot_inv = transpose( transpose(mat3(1,0,0,  0,cos(eye_roll),sin(eye_roll), 0,-sin(eye_roll),cos(eye_roll))) * transpose(mat3(cos(eye_pitch),0,-sin(eye_pitch), 0,1,0, sin(eye_pitch),0,cos(eye_pitch))) * transpose(mat3(cos(eye_yaw),sin(eye_yaw),0,-sin(eye_yaw),cos(eye_yaw),0,0,0,1)) );\n"
+	"	vec3 point_in_world_frame = eye_rot_inv * point_in_eye_frame;\n"
+	"	float yaw = atan( point_in_world_frame.y , point_in_world_frame.x );\n"
+	"	float pitch = atan(-point_in_world_frame.z, sqrt(pow(point_in_world_frame.x,2)+pow(point_in_world_frame.y,2)));\n"
+	//"	outColor = vec4( 10*yaw/2/3.1415+0.5, 10*pitch/3.1415+0.5,0.5,1);\n"
+	"	outColor = texture(texVideo, vec2( yaw/2/3.141593654+0.5, pitch/3.141592654+0.5 ))+vec4(0,0.2,0,0);\n"
+	//"	outColor = texture(texVideo, Texcoord);\n"
+	//"	outColor = vec4(Texcoord,0,1.0);\n"
 	"}\n";
 
 const char* justDrawASpriteFragmentSource =
@@ -175,6 +208,26 @@ float vertices[] = {
 	-1.f, -1.f,  -PI,-PI/2,  // Vertex 4 (X, Y)
 	-1.f,  1.f,  -PI,PI/2  // Vertex 1 (X, Y)
 };
+
+float vertices2[] = {
+	-1.f,  1.f,  1.f,0.f,  // Vertex 1 (X, Y)
+	 1.f,  1.f,  0.f,0.f,  // Vertex 2 (X, Y)
+	 1.f, -1.f,  0.f,1.f,  // Vertex 3 (X, Y)
+
+	 1.f, -1.f,  0.f,1.f,  // Vertex 3 (X, Y)
+	-1.f, -1.f,  1.f,1.f,  // Vertex 4 (X, Y)
+	-1.f,  1.f,  1.f,0.f   // Vertex 1 (X, Y)
+};
+
+/*float vertices2[] = {
+	-1.f,  1.f,  0.f,1.f,  // Vertex 1 (X, Y)
+	 1.f,  1.f,  1.f,1.f,  // Vertex 2 (X, Y)
+	 1.f, -1.f,  1.f,0.f,  // Vertex 3 (X, Y)
+
+	 1.f, -1.f,  1.f,0.f,  // Vertex 3 (X, Y)
+	-1.f, -1.f,  0.f,0.f,  // Vertex 4 (X, Y)
+	-1.f,  1.f,  0.f,1.f   // Vertex 1 (X, Y)
+};*/
 
 float wholescreenVertices[] = {
 	-1.f, -1.f,  // Vertex 1 (X, Y)
@@ -264,6 +317,27 @@ GLuint newCanvasShaderProgram(GLuint vao, GLuint vbo)
 {
 	GLuint vertexShader, fragmentShader, shaderProgram;
 	compileShaderProgram(justDrawASpriteVertexSource, drawOnCanvasFragmentSource, vertexShader, fragmentShader, shaderProgram);
+
+
+	glBindVertexArray(vao);
+	glBindBuffer(GL_ARRAY_BUFFER, vbo);
+	
+	// set up shaders
+	GLint posAttrib = glGetAttribLocation(shaderProgram, "position");
+	glEnableVertexAttribArray(posAttrib);
+	glVertexAttribPointer(posAttrib, 2, GL_FLOAT, GL_FALSE, 4*sizeof(float), 0);
+
+
+	GLint texAttrib = glGetAttribLocation(shaderProgram, "texcoord");
+	glEnableVertexAttribArray(texAttrib);
+	glVertexAttribPointer(texAttrib, 2, GL_FLOAT, GL_FALSE, 4*sizeof(float), (void*)(2*sizeof(float)));
+
+	return shaderProgram;
+}
+GLuint newEyeShaderProgram(GLuint vao, GLuint vbo)
+{
+	GLuint vertexShader, fragmentShader, shaderProgram;
+	compileShaderProgram(justDrawASpriteVertexSource, drawFromCanvasFragmentSource, vertexShader, fragmentShader, shaderProgram);
 
 
 	glBindVertexArray(vao);
@@ -408,19 +482,24 @@ int main(int argc, const char** argv)
 	GLFWwindow* window = initOpenGL();
 
 
-	GLuint vaoCanvas, vaoQuad, vaoWholescreenQuad;
+	GLuint vaoCanvas, vaoEye, vaoQuad, vaoWholescreenQuad;
 	glGenVertexArrays(1, &vaoCanvas);
+	glGenVertexArrays(1, &vaoEye);
 	glGenVertexArrays(1, &vaoQuad);
 	glGenVertexArrays(1, &vaoWholescreenQuad);
 
 
-	GLuint vboCanvas, vboQuad, vboWholescreenQuad;
+	GLuint vboCanvas, vboEye, vboQuad, vboWholescreenQuad;
 	glGenBuffers(1, &vboCanvas);
+	glGenBuffers(1, &vboEye);
 	glGenBuffers(1, &vboQuad);
 	glGenBuffers(1, &vboWholescreenQuad);
 
 	glBindBuffer(GL_ARRAY_BUFFER, vboCanvas);
 	glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+
+	glBindBuffer(GL_ARRAY_BUFFER, vboEye);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(vertices2), vertices2, GL_STATIC_DRAW);
 
 	glBindBuffer(GL_ARRAY_BUFFER, vboQuad);
 	glBufferData(GL_ARRAY_BUFFER, sizeof(quadVertices), quadVertices, GL_STATIC_DRAW);
@@ -440,6 +519,10 @@ int main(int argc, const char** argv)
 	GLint uniCamYaw = glGetUniformLocation(drawOnCanvasProgram, "cam_yaw");
 	GLint uniCamPitch = glGetUniformLocation(drawOnCanvasProgram, "cam_pitch");
 	GLint uniCamRoll = glGetUniformLocation(drawOnCanvasProgram, "cam_roll");
+	GLuint drawFromCanvasProgram = newEyeShaderProgram(vaoEye, vboEye);
+	GLint uniEyeYaw = glGetUniformLocation(drawFromCanvasProgram, "eye_yaw");
+	GLint uniEyePitch = glGetUniformLocation(drawFromCanvasProgram, "eye_pitch");
+	GLint uniEyeRoll = glGetUniformLocation(drawFromCanvasProgram, "eye_roll");
 
 	// texture
 	GLuint texVideo;
@@ -630,19 +713,21 @@ glBlendFunc (GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 		glUseProgram(drawOnCanvasProgram);
 		glActiveTexture(GL_TEXTURE0);
 		glBindTexture(GL_TEXTURE_2D, texVideo);
-
-	glUniform1f(uniCamYaw,(float)total_x/virtual_canvas_width*2*PI);
-	glUniform1f(uniCamPitch,-(float)total_y/px_per_deg/180.*PI);
-	glUniform1f(uniCamRoll,-total_rot/180.*PI);
+		glUniform1f(uniCamYaw,(float)total_x/virtual_canvas_width*2*PI);
+		glUniform1f(uniCamPitch,-(float)total_y/px_per_deg/180.*PI);
+		glUniform1f(uniCamRoll,-total_rot/180.*PI);
 		glDrawArrays(GL_TRIANGLES, 0, 6);
 
 
 		glBindFramebuffer(GL_FRAMEBUFFER, eyeFB);
 		glViewport(0,0,EYE_WIDTH,EYE_HEIGHT);
-		glBindVertexArray(vaoQuad);
-		glUseProgram(quadShaderProgram);
+		glBindVertexArray(vaoEye);
+		glUseProgram(drawFromCanvasProgram);
 		glActiveTexture(GL_TEXTURE0);
 		glBindTexture(GL_TEXTURE_2D, canvasTex);
+		glUniform1f(uniEyeYaw,3.1415+(float)total_x/virtual_canvas_width*2*PI);
+		glUniform1f(uniEyePitch,(float)total_y/px_per_deg/180.*PI);
+		glUniform1f(uniEyeRoll,0);
 		glDrawArrays(GL_TRIANGLES, 0, 6);
 
 
@@ -651,7 +736,7 @@ glBlendFunc (GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 		glBindVertexArray(vaoWholescreenQuad);
 		glUseProgram(oculusShaderProgram);
 		glActiveTexture(GL_TEXTURE0);
-		glBindTexture(GL_TEXTURE_2D, canvasTex/*eyeTex*/);
+		glBindTexture(GL_TEXTURE_2D, eyeTex);
 		glDrawArrays(GL_TRIANGLES, 0, 6);
 
 
