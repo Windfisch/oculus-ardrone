@@ -97,6 +97,15 @@ const char* oculusFragmentSource =
 	"	float bval = texture(texVideo, loc_b).r;\n"
 	"	outColor = vec4(rval,gval,bval,1.0);\n"
 	"}\n";
+const char* oculusDummyFragmentSource =
+	"#version 150\n"
+	"uniform sampler2D texVideo;\n"
+	"in vec2 Screencoord;\n"
+	"out vec4 outColor;\n"
+	"void main()\n"
+	"{\n"
+	"	outColor = texture(texVideo, Screencoord/vec2(2,2)+vec2(0.5,0.5));\n"
+	"}\n";
 
 const char* justDrawASpriteFragmentSourceGray =
 	"#version 150\n"
@@ -230,7 +239,7 @@ GLuint justDrawASpriteShaderProgram(GLuint vao, GLuint vbo, bool gray=false)
 GLuint newOculusShaderProgram(GLuint vao, GLuint vbo)
 {
 	GLuint vertexShader, fragmentShader, shaderProgram;
-	compileShaderProgram(oculusVertexSource, oculusFragmentSource, vertexShader, fragmentShader, shaderProgram);
+	compileShaderProgram(oculusVertexSource, oculusDummyFragmentSource, vertexShader, fragmentShader, shaderProgram);
 
 
 	glBindVertexArray(vao);
@@ -571,8 +580,10 @@ int main(int argc, const char** argv)
 		glBindVertexArray(vaoWholescreenQuad);
 		glUseProgram(oculusShaderProgram);
 		glActiveTexture(GL_TEXTURE0);
-		glBindTexture(GL_TEXTURE_2D, eyeTex);
+		glBindTexture(GL_TEXTURE_2D, canvasTex/*eyeTex*/);
 		glDrawArrays(GL_TRIANGLES, 0, 6);
+
+
 
 
 
