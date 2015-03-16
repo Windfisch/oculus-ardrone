@@ -84,7 +84,7 @@ const char* drawOnCanvasFragmentSource =
 	"	     (0 <= point_in_cam_pic.x && point_in_cam_pic.x < CAM_XRES) && \n"
 	"	     (0 <= point_in_cam_pic.y && point_in_cam_pic.y < CAM_YRES) ) \n"
 	"	{\n"
-	"		outColor = texture(texVideo, vec2(1.0,1.0)-point_in_cam_pic/vec2(CAM_XRES,CAM_YRES));\n"
+	"		outColor.rgb = texture(texVideo, vec2(1.0,1.0)-point_in_cam_pic/vec2(CAM_XRES,CAM_YRES)).bgr;\n"
 	"		float xmarg = min(  (min(point_in_cam_pic.x, CAM_XRES-point_in_cam_pic.x)/margin_thickness), 1.0);\n"
 	"		float ymarg = min(  (min(point_in_cam_pic.y, CAM_YRES-point_in_cam_pic.y)/margin_thickness), 1.0);\n"
 	"		outColor.a=xmarg*ymarg;\n"
@@ -94,7 +94,7 @@ const char* drawOnCanvasFragmentSource =
 	"		outColor = vec4(0.0,0.0,0.0,0.00);"
 	"	float xxx = Texcoord.x/3.141592654*180/10+100;"
 	"	float yyy = Texcoord.y/3.141592654*180/10+100;"
-	"	if ( (abs(xxx- int(xxx)) < 0.1) || (abs(yyy- int(yyy)) <.1)) outColor = vec4(0.5,0.5,0.5,0.5);"
+	"	if ( (abs(xxx- int(xxx)) < 0.03) || (abs(yyy- int(yyy)) <.03)) outColor = vec4(0.5,0.5,0.5,1);"
 	"}\n";
 
 
@@ -105,7 +105,7 @@ const char* drawFromCanvasFragmentSource =
 	"uniform float eye_pitch;\n"
 	"uniform float eye_roll;\n"
 	"const float aspect_ratio=1280./720.;\n"
-	"const float horiz_field_of_view=70/180.*3.141592654;\n"
+	"const float horiz_field_of_view=80/180.*3.141592654;\n"
 	"const float CAM_FX=1/2.0 / tan(horiz_field_of_view/2.0);\n"
 	"const mat3 eye_cal_inv = transpose(mat3(1/CAM_FX, 0, -1/2/CAM_FX,    0, 1/CAM_FX, -1/aspect_ratio/2/CAM_FX,     0,0,1));\n"
 	"const mat3 opencv_to_math = mat3(0,1,0,   0,0,1,   -1,0,0);\n"
@@ -121,7 +121,7 @@ const char* drawFromCanvasFragmentSource =
 	"	float yaw = atan( point_in_world_frame.y , point_in_world_frame.x );\n"
 	"	float pitch = atan(-point_in_world_frame.z, sqrt(pow(point_in_world_frame.x,2)+pow(point_in_world_frame.y,2)));\n"
 	//"	outColor = vec4( 10*yaw/2/3.1415+0.5, 10*pitch/3.1415+0.5,0.5,1);\n"
-	"	outColor = texture(texVideo, vec2( yaw/2/3.141593654+0.5, pitch/3.141592654+0.5 ))+vec4(0,0.2,0,0);\n"
+	"	outColor = texture(texVideo, vec2( yaw/2/3.141593654+0.5, pitch/3.141592654+0.5 ));\n"
 	//"	outColor = texture(texVideo, Texcoord);\n"
 	//"	outColor = vec4(Texcoord,0,1.0);\n"
 	"}\n";
