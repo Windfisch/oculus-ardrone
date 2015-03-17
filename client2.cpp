@@ -360,8 +360,9 @@ void calc_undistort_maps(float px_per_deg, int width, int height, Mat& map1, Mat
 	camera_matrix2.at<float>(1,2)=height/2.; //cy
 
 	float px_per_rad = px_per_deg * PI / 180.;
+	float k = px_per_rad / width;
 
-	Matx<float,1,5> dist_coeffs(-px_per_rad*px_per_rad/3.f, px_per_rad*px_per_rad*px_per_rad*px_per_rad/5.f, 0.f, 0.f, -px_per_rad*px_per_rad*px_per_rad*px_per_rad*px_per_rad*px_per_rad/7.f);
+	Matx<float,1,5> dist_coeffs(-k*k/3.f, k*k*k*k/5.f, 0.f, 0.f, -k*k*k*k*k*k/7.f);
 
 	initUndistortRectifyMap(camera_matrix, dist_coeffs, Mat(), camera_matrix2, Size(width,height), CV_32FC1, map1, map2);
 }
@@ -419,6 +420,21 @@ int init_ohmd(ohmd_context** ctx_, ohmd_device** hmd_)
 	return 0;
 }
 
+
+float deadzone(float val, float dead)
+{
+	if (val < 0.)
+	{
+		if (val < -dead) val+=dead;
+		else val=0.;
+	}
+	else
+	{
+	if (val > dead) val-=dead;
+		else val=0.;
+	}
+	return val;
+}
 
 
 int main(int argc, const char** argv)
@@ -509,7 +525,7 @@ int main(int argc, const char** argv)
 	navdata_t navdata;
 
 	Mat map1(Size(width,height), CV_32FC1), map2(Size(width,height), CV_32FC1);
-	calc_undistort_maps(80/1280., 1280,720, map1, map2);
+	calc_undistort_maps(80, 1280,720, map1, map2);
 
 	float diag = sqrt(1280*1280+720*720);
 	float px_per_deg = diag / 92.;
@@ -619,13 +635,17 @@ int main(int argc, const char** argv)
 		double yaw_diff = fixup_range( ringbuf_yaw_cam.get() - ringbuf_yaw_sensor.get(), -180, 180);
 		double pitch_diff = ringbuf_pitch_cam.get() + ringbuf_pitch_sensor.get();
 		double roll_diff = fixup_angle(ringbuf_roll_cam.get() - (-ringbuf_roll_sensor.get()));
+
+		yaw_diff = deadzone(yaw_diff, 1.0);
+		pitch_diff = deadzone(pitch_diff, 1.0);
+		roll_diff = deadzone(roll_diff, 1.0);
 		
 		//if (fabs(xdiff) < px_per_deg) xdiff = 0.0;
 		//if (fabs(ydiff) < px_per_deg) ydiff = 0.0;
 		//if (fabs(adiff) < 2) adiff = 0.0;
 
-		yaw_diff*=0.02;
-		pitch_diff*=0.02;
+		yaw_diff*=0.1;
+		pitch_diff*=0.1;
 		roll_diff*=0.5;
 		yaw_cam = fixup_range(yaw_cam - yaw_diff, -180, 180);
 		pitch_cam = pitch_cam - pitch_diff;
