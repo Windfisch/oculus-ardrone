@@ -515,13 +515,13 @@ int main(int argc, const char** argv)
 	float px_per_deg = diag / 92.;
 
 
-	int total_x = 100, total_y = 00;
+	float total_x = 100/px_per_deg, total_y = 0;
 	float total_rot = 0.0;
 
 	Mat frame(Size(1280,720), CV_8UC3), frame_(Size(1280,720), CV_8UC3), gray, oldgray;
 
 	#define RINGBUF_SIZE 4
-	ModuloRingbuffer ringbuf_x(RINGBUF_SIZE, -180*px_per_deg, 180*px_per_deg);
+	ModuloRingbuffer ringbuf_x(RINGBUF_SIZE, -180, 180);
 	Ringbuffer ringbuf_y(RINGBUF_SIZE);
 	ModuloRingbuffer ringbuf_a(RINGBUF_SIZE, -180,180);
 	ModuloRingbuffer ringbuf_phi(RINGBUF_SIZE, -180,180);
@@ -602,12 +602,12 @@ int main(int argc, const char** argv)
 			printf("no mat!\n");
 		}
 
-		total_x +=  cos(total_rot*PI/180.)*shift_x + sin(total_rot*PI/180.)*shift_y;
-		total_y += -sin(total_rot*PI/180.)*shift_x + cos(total_rot*PI/180.)*shift_y;
+		total_x += ( cos(total_rot*PI/180.)*shift_x + sin(total_rot*PI/180.)*shift_y) / px_per_deg;
+		total_y += (-sin(total_rot*PI/180.)*shift_x + cos(total_rot*PI/180.)*shift_y) / px_per_deg;
 		total_rot = fixup_angle(total_rot+angle);
 
 		ringbuf_x.put(total_x);
-		ringbuf_y.put(total_y);
+		ringbuf_y.put(total_y); //TODO
 		ringbuf_a.put(total_rot);
 		ringbuf_phi.put(navdata.phi);
 		ringbuf_psi.put(navdata.psi);
@@ -615,8 +615,8 @@ int main(int argc, const char** argv)
 		ringbuf_theta2.put(navdata.theta);
 		ringbuf_theta.put(navdata.theta);
 
-		double xdiff = fixup_range( ringbuf_x.get() - px_per_deg*ringbuf_psi.get(), -180*px_per_deg, 180*px_per_deg);
-		double ydiff = ringbuf_y.get() + px_per_deg*ringbuf_theta.get();
+		double xdiff = fixup_range( ringbuf_x.get() - ringbuf_psi.get(), -180, 180);
+		double ydiff = ringbuf_y.get() + ringbuf_theta.get();
 		double adiff = fixup_angle(ringbuf_a.get() - (-ringbuf_phi.get()));
 		
 		//if (fabs(xdiff) < px_per_deg) xdiff = 0.0;
@@ -626,14 +626,14 @@ int main(int argc, const char** argv)
 		xdiff*=0.02;
 		ydiff*=0.02;
 		adiff*=0.5;
-		total_x = fixup_range(total_x - xdiff, -180*px_per_deg, 180*px_per_deg);
+		total_x = fixup_range(total_x - xdiff, -180, 180);
 		total_y = total_y - ydiff;
 		total_rot = fixup_angle(total_rot - adiff);
 		ringbuf_x.add(-xdiff);
 		ringbuf_y.add(-ydiff);
 		ringbuf_a.add(-adiff);
 		
-		//total_x = navdata.psi * px_per_deg;
+		//total_x = navdata.psi;
 		//total_y = - navdata.theta * px_per_deg;
 		//total_rot = -navdata.phi;
 
@@ -680,8 +680,8 @@ int main(int argc, const char** argv)
 		glUseProgram(drawOnCanvasProgram);
 		glActiveTexture(GL_TEXTURE0);
 		glBindTexture(GL_TEXTURE_2D, texVideo);
-		glUniform1f(uniCamYaw,(float)total_x/(360*px_per_deg)*2*PI);
-		glUniform1f(uniCamPitch,-(float)total_y/px_per_deg/180.*PI);
+		glUniform1f(uniCamYaw,(float)total_x/180.*PI);
+		glUniform1f(uniCamPitch,-(float)total_y/180.*PI);
 		glUniform1f(uniCamRoll,-total_rot/180.*PI);
 		glDrawArrays(GL_TRIANGLES, 0, 6);
 
