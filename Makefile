@@ -10,7 +10,7 @@ simple.o: simple.c
 	gcc -std=gnu99   -Wall  -DOHMD_STATIC -Icontrib/OpenHMD/include/  -g -O2  -c -o simple.o simple.c
 
 contrib/OpenHMD/src/.libs/libopenhmd.a:
-	cd contrib/OpenHMD && ./configure --enable-static=yes && make -j5
+	cd contrib/OpenHMD && ./autogen.sh && ./configure --enable-static=yes && make -j5
 
 clean:
 	rm -f simple.o simple
