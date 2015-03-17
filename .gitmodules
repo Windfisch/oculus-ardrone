@@ -1,3 +1,4 @@
 [submodule "contrib/OpenHMD"]
 	path = contrib/OpenHMD
 	url = git://github.com/OpenHMD/OpenHMD.git
+	ignore = dirty
