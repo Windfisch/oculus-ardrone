@@ -26,12 +26,12 @@ using namespace cv;
 
 
 #define PX_PER_DEG_CANVAS 16
-#define CANVAS_XDEG 450
-#define CANVAS_YDEG 120
+#define CANVAS_XDEG 360
+#define CANVAS_YDEG 180
 #define CANVAS_WIDTH  CANVAS_XDEG*PX_PER_DEG_CANVAS
 #define CANVAS_HEIGHT CANVAS_YDEG*PX_PER_DEG_CANVAS
-#define SCREEN_WIDTH  (1920/2)
-#define SCREEN_HEIGHT (1080/2)
+#define SCREEN_WIDTH  (1920)
+#define SCREEN_HEIGHT (1080)
 #define EYE_WIDTH (SCREEN_WIDTH/2)
 #define EYE_HEIGHT SCREEN_HEIGHT
 #define EYE_XDEG 30
@@ -106,7 +106,7 @@ const char* drawFromCanvasFragmentSource =
 	"uniform float eye_pitch;\n"
 	"uniform float eye_roll;\n"
 	"const float aspect_ratio=1280./720.;\n"
-	"const float horiz_field_of_view=80/180.*3.141592654;\n"
+	"const float horiz_field_of_view=60/180.*3.141592654;\n"
 	"const float CAM_FX=1/2.0 / tan(horiz_field_of_view/2.0);\n"
 	"const mat3 eye_cal_inv = transpose(mat3(1/CAM_FX, 0, -1/2/CAM_FX,    0, 1/CAM_FX, -1/aspect_ratio/2/CAM_FX,     0,0,1));\n"
 	"const mat3 opencv_to_math = mat3(0,1,0,   0,0,1,   -1,0,0);\n"
@@ -155,15 +155,17 @@ const char* oculusFragmentSource =
 	"const vec2 RightLensCenter = vec2(-0.2, 0.);\n"
 	//"const vec4 HmdWarpParam   = vec4(1, 0, 0, 0);\n"
 	"const vec4 HmdWarpParam   = vec4(1, 0.2, 0.1, 0);\n"
-	"const float aberr_r = 0.97;\n"
-	"const float aberr_b = 1.03;\n"
-//	"const float aberr_r = 0.985;\n"
-//	"const float aberr_b = 1.015;\n"
+	"const float aberr_r = 0.99;\n"
+	"const float aberr_b = 1.01;\n"
+//	"const float aberr_r = 0.97;\n"
+//	"const float aberr_b = 1.03;\n"
+////	"const float aberr_r = 0.985;\n"
+////	"const float aberr_b = 1.015;\n"
 	"void main()\n"
 	"{\n"
 	"	vec2 LensCenter = Screencoord.x < 0 ? LeftLensCenter : RightLensCenter;\n"
 	"	float x = (Screencoord.x > 0? Screencoord.x : (Screencoord.x+1))*2 -1;\n" // between -1 and 1
-	"	float y = (Screencoord.y);\n"
+	"	float y = (Screencoord.y)/2.5*4.;\n"
 	"	vec2 theta = (vec2(x,y) - LensCenter);\n"
 	"	float rSq = theta.x*theta.x+theta.y*theta.y;\n"
 	"	vec2 rvector = theta * (HmdWarpParam.x + HmdWarpParam.y * rSq +"
@@ -172,9 +174,9 @@ const char* oculusFragmentSource =
 	"	vec2 loc_g = (      1 * rvector + LensCenter)/vec2(2,2)+vec2(0.5,0.5);\n"
 	"	vec2 loc_b = (aberr_b * rvector + LensCenter)/vec2(2,2)+vec2(0.5,0.5);\n"
 	"\n"
-	"	float rval = texture(texVideo, loc_r).b;\n"
+	"	float rval = texture(texVideo, loc_r).r;\n"
 	"	float gval = texture(texVideo, loc_g).g;\n"
-	"	float bval = texture(texVideo, loc_b).r;\n"
+	"	float bval = texture(texVideo, loc_b).b;\n"
 	"	outColor = vec4(rval,gval,bval,1.0);\n"
 	"}\n";
 const char* oculusDummyFragmentSource =
@@ -382,7 +384,7 @@ GLuint justDrawASpriteShaderProgram(GLuint vao, GLuint vbo, bool gray=false)
 GLuint newOculusShaderProgram(GLuint vao, GLuint vbo)
 {
 	GLuint vertexShader, fragmentShader, shaderProgram;
-	compileShaderProgram(oculusVertexSource, oculusDummyFragmentSource, vertexShader, fragmentShader, shaderProgram);
+	compileShaderProgram(oculusVertexSource, oculusFragmentSource, vertexShader, fragmentShader, shaderProgram);
 
 
 	glBindVertexArray(vao);
