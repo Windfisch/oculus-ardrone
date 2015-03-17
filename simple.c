@@ -9,6 +9,9 @@
 
 #include <openhmd.h>
 #include <stdio.h>
+#include <math.h>
+
+#define PI 3.141593654
 
 void ohmd_sleep(double);
 
@@ -56,10 +59,18 @@ int main(int argc, char** argv)
 	for(int i = 0; i < 10000; i++){
 		ohmd_ctx_update(ctx);
 
-		float quat[4];
-		ohmd_device_getf(hmd, OHMD_ROTATION_QUAT, quat);
+		float quat[4],quat_[4];
+		ohmd_device_getf(hmd, OHMD_ROTATION_QUAT, quat_);
+		quat[0]=quat_[0];
+		quat[1]=quat_[1];
+		quat[2]=quat_[3];
+		quat[3]=quat_[2];
+		float oculus_yaw = atan2( 2.0* (quat[1]*quat[2]+quat[0]*quat[3]), (quat[0]*quat[0]+quat[1]*quat[1]-quat[2]*quat[2]-quat[3]*quat[3]) );
+		float oculus_pitch = asin(2.0*(quat[0]*quat[2]-quat[1]*quat[3]));
+		float oculus_roll = -atan2(2.0*(quat[2]*quat[3]+quat[0]*quat[1]), -(quat[0]*quat[0]-quat[1]*quat[1]-quat[2]*quat[2]+quat[3]*quat[3]));
 		printf("quat:\t %f\t%f\t%f\t%f\n", quat[0],quat[1],quat[2],quat[3]);
 
+		printf("oculus yaw, pitch, roll = \t%f\t%f\t%f\n", oculus_yaw*180/PI, oculus_pitch*180/PI, oculus_roll*180/PI);
 
 		ohmd_sleep(.01);
 	}

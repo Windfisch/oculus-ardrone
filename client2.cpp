@@ -2,6 +2,7 @@
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
 
+#include <openhmd.h>
 #include <unistd.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -476,6 +477,43 @@ void genFramebuffer(GLuint& frameBuffer, GLuint& texColorBuffer, int w, int h, b
 	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texColorBuffer, 0);
 }
 
+
+int init_ohmd(ohmd_context** ctx_, ohmd_device** hmd_)
+{
+	ohmd_context* ctx = ohmd_ctx_create();
+
+	// Probe
+	int num_devices = ohmd_ctx_probe(ctx);
+	if(num_devices < 0)
+	{
+		printf("device probing failed: %s\n", ohmd_ctx_get_error(ctx));
+		return -1;
+	}
+
+	printf("i've got %d devices\n\n", num_devices);
+
+	ohmd_device* hmd = ohmd_list_open_device(ctx, 0);
+	
+	if(!hmd)
+	{
+		printf("open failed! %s\n", ohmd_ctx_get_error(ctx));
+		return -1;
+	}
+
+	// Print hardware information for the opened device
+	int ivals[2];
+	ohmd_device_geti(hmd, OHMD_SCREEN_HORIZONTAL_RESOLUTION, ivals);
+	ohmd_device_geti(hmd, OHMD_SCREEN_VERTICAL_RESOLUTION, ivals + 1);
+	printf("resolution:         %i x %i\n", ivals[0], ivals[1]);
+
+	*ctx_=ctx;
+	*hmd_=hmd;
+
+	return 0;
+}
+
+
+
 int main(int argc, const char** argv)
 {
 
@@ -554,6 +592,15 @@ glBlendFunc (GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
 
 
+
+	ohmd_context* my_ohmd_context;
+	ohmd_device* my_ohmd_device;
+	if (init_ohmd(&my_ohmd_context, &my_ohmd_device)) return 1;
+
+
+
+
+
 	DroneConnection drone(SOCKETPATH);
 	navdata_t navdata;
 
@@ -609,6 +656,9 @@ glBlendFunc (GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 	int adjust_phi=10;
 	while ((key=waitKey(1)) != 'x')
 	{
+		printf("\033[H");
+
+
 		drone.get(frame_, &navdata);
 		delay_phi.put(navdata.phi);
 		delay_psi.put(navdata.psi);
@@ -695,6 +745,26 @@ glBlendFunc (GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
 
 
+		ohmd_ctx_update(my_ohmd_context);
+
+		float quat[4],quat_[4];
+		ohmd_device_getf(my_ohmd_device, OHMD_ROTATION_QUAT, quat_);
+		quat[0]=quat_[0];
+		quat[1]=quat_[1];
+		quat[2]=quat_[3];
+		quat[3]=quat_[2];
+		
+		float oculus_yaw = atan2( 2.0* (quat[1]*quat[2]+quat[0]*quat[3]), (quat[0]*quat[0]+quat[1]*quat[1]-quat[2]*quat[2]-quat[3]*quat[3]) );
+		float oculus_pitch = asin(2.0*(quat[0]*quat[2]-quat[1]*quat[3]));
+		float oculus_roll = -atan2(2.0*(quat[2]*quat[3]+quat[0]*quat[1]), -(quat[0]*quat[0]-quat[1]*quat[1]-quat[2]*quat[2]+quat[3]*quat[3]));
+
+		printf("oculus yaw, pitch, roll = \t%f\t%f\t%f\n", oculus_yaw*180/PI, oculus_pitch*180/PI, oculus_roll*180/PI);
+
+
+
+
+
+
 
 
 
@@ -727,11 +797,14 @@ glBlendFunc (GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 		glUseProgram(drawFromCanvasProgram);
 		glActiveTexture(GL_TEXTURE0);
 		glBindTexture(GL_TEXTURE_2D, canvasTex);
-		glUniform1f(uniEyeYaw,3.1415+ringbuf_psi2.get()/180.*PI);
+		/*glUniform1f(uniEyeYaw,3.1415+ringbuf_psi2.get()/180.*PI);
 		glUniform1f(uniEyePitch,-ringbuf_theta2.get()/180.*PI);
 		//glUniform1f(uniEyeYaw,3.1415+(float)total_x/virtual_canvas_width*2*PI);
 		//glUniform1f(uniEyePitch,(float)total_y/px_per_deg/180.*PI);
-		glUniform1f(uniEyeRoll,0);
+		glUniform1f(uniEyeRoll,0);*/
+		glUniform1f(uniEyeYaw,oculus_yaw);
+		glUniform1f(uniEyePitch,-oculus_pitch);
+		glUniform1f(uniEyeRoll,-oculus_roll);
 		glDrawArrays(GL_TRIANGLES, 0, 6);
 
 

@@ -1,5 +1,5 @@
-client2: client2.cpp lib.cpp ringbuf.h
-	g++ -std=c++11 -g client2.cpp lib.cpp -lglfw -lGLEW -lGLU -lGL `pkg-config --libs opencv` -lm  -o client2
+client2: client2.cpp lib.cpp ringbuf.h contrib/OpenHMD/src/.libs/libopenhmd.a
+	g++ -std=c++11 -g client2.cpp lib.cpp -lglfw -lGLEW -lGLU -lGL `pkg-config --libs opencv` -lm -DOHMD_STATIC -Icontrib/OpenHMD/include/ contrib/OpenHMD/src/.libs/libopenhmd.a -lhidapi-libusb -lrt -lpthread -o client2
 client: client.c
 	gcc client.c -lX11 -lXi -lXmu -lglut -lGL -lGLU -lm  -o client
 
