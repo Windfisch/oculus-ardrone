@@ -93,9 +93,9 @@ const char* drawOnCanvasFragmentSource =
 	//"		outColor = vec4(point_in_cam_pic/vec2(CAM_XRES,CAM_YRES),-point_in_cam_pic_uniform.z/1000,1);\n"
 	"	else\n"
 	"		outColor = vec4(0.0,0.0,0.0,0.00);"
-	//"	float xxx = Texcoord.x/3.141592654*180/10+100;"
-	//"	float yyy = Texcoord.y/3.141592654*180/10+100;"
-	//"	if ( (abs(xxx- int(xxx)) < 0.03) || (abs(yyy- int(yyy)) <.03)) outColor = vec4(0.5,0.5,0.5,1);"
+//	"	float xxx = Texcoord.x/3.141592654*180/10+100;"
+//	"	float yyy = Texcoord.y/3.141592654*180/10+100;"
+//	"	if ( (abs(xxx- int(xxx)) < 0.01) || (abs(yyy- int(yyy)) <.01)) outColor = vec4(1,1,1,1); else outColor = vec4(0,0,0,1);"
 	"}\n";
 
 
@@ -156,8 +156,8 @@ const char* oculusFragmentSource =
 	//"const vec4 HmdWarpParam   = vec4(1, 0, 0, 0);\n"
 	"const vec4 HmdWarpParam   = vec4(1, 0.2, 0.1, 0)*0.78;\n"
 	//"const vec4 HmdWarpParam   = vec4(1, 0., 0., 0);\n"
-	"const float aberr_r = 0.99;\n"
-	"const float aberr_b = 1.01;\n"
+	"uniform float aberr_r;\n"
+	"uniform float aberr_b;\n"
 //	"const float aberr_r = 0.97;\n"
 //	"const float aberr_b = 1.03;\n"
 ////	"const float aberr_r = 0.985;\n"
@@ -557,6 +557,8 @@ int main(int argc, const char** argv)
 	GLuint shaderProgram = justDrawASpriteShaderProgram(vaoCanvas, vboCanvas);
 	GLuint quadShaderProgram = justDrawASpriteShaderProgram(vaoQuad, vboQuad);
 	GLuint oculusShaderProgram = newOculusShaderProgram(vaoWholescreenQuad, vboWholescreenQuad);
+	GLint uniAberrR = glGetUniformLocation(oculusShaderProgram, "aberr_r");
+	GLint uniAberrB = glGetUniformLocation(oculusShaderProgram, "aberr_b");
 	GLuint drawOnCanvasProgram = newCanvasShaderProgram(vaoCanvas, vboCanvas);
 	GLint uniCamYaw = glGetUniformLocation(drawOnCanvasProgram, "cam_yaw");
 	GLint uniCamPitch = glGetUniformLocation(drawOnCanvasProgram, "cam_pitch");
@@ -658,7 +660,8 @@ glBlendFunc (GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
 	char key;
 	int adjust_phi=10;
-	while ((key=waitKey(1)) != 'x')
+	float aberr_r=0.989, aberr_b=1.021;
+	while ((key=waitKey(1)) != 'e')
 	{
 		printf("\033[H");
 
@@ -675,6 +678,13 @@ glBlendFunc (GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
 		if (key=='q') adjust_phi++;
 		if (key=='w') adjust_phi--;
+		
+		if (key=='a') aberr_r+=0.001;
+		if (key=='z') aberr_r-=0.001;
+		if (key=='s') aberr_b+=0.001;
+		if (key=='x') aberr_b-=0.001;
+
+		printf("aberr_r/b = \t%f\t%f\n",aberr_r,aberr_b);
 		
 		//for (int i=0; i<1280; i+=50) frame_.col(i)=Scalar(0,255,255);
 		//for (int i=0; i<720; i+=50) frame_.row(i)=Scalar(0,255,255);
@@ -816,6 +826,8 @@ glBlendFunc (GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 		glViewport(0,0,SCREEN_WIDTH, SCREEN_HEIGHT);
 		glBindVertexArray(vaoWholescreenQuad);
 		glUseProgram(oculusShaderProgram);
+		glUniform1f(uniAberrR, aberr_r);
+		glUniform1f(uniAberrB, aberr_b);
 		glActiveTexture(GL_TEXTURE0);
 		glBindTexture(GL_TEXTURE_2D, eyeTex);
 		glDrawArrays(GL_TRIANGLES, 0, 6);
