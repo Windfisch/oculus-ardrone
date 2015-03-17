@@ -508,32 +508,20 @@ int main(int argc, const char** argv)
 	DroneConnection drone(SOCKETPATH);
 	navdata_t navdata;
 
-	Mat white(Size(1280,720), CV_8UC3, Scalar(255,255,255));
 	Mat map1(Size(width,height), CV_32FC1), map2(Size(width,height), CV_32FC1);
 	calc_undistort_maps(80/1280., 1280,720, map1, map2);
 
-	float scale_factor = 0.2;
 	float diag = sqrt(1280*1280+720*720);
 	float px_per_deg = diag / 92.;
-
-	int virtual_canvas_width = 360. * px_per_deg;
-	int virtual_canvas_height = 90. * px_per_deg;
-
-	int real_canvas_extra_width = sqrt(1280*1280+720*720)*scale_factor/2 + 2;
-	int real_canvas_width = virtual_canvas_width * scale_factor  +  2*real_canvas_extra_width;
-	int real_canvas_height = virtual_canvas_height * scale_factor;
 
 
 	int total_x = 100, total_y = 00;
 	float total_rot = 0.0;
 
 	Mat frame(Size(1280,720), CV_8UC3), frame_(Size(1280,720), CV_8UC3), gray, oldgray;
-	Mat screencontent(real_canvas_height,real_canvas_width, CV_8UC3);
-	Mat screencontent_(real_canvas_height,real_canvas_width, CV_8UC3);
-	Mat screencontent_mask(real_canvas_height,real_canvas_width, CV_8UC3);
 
 	#define RINGBUF_SIZE 4
-	ModuloRingbuffer ringbuf_x(RINGBUF_SIZE, -virtual_canvas_width/2, virtual_canvas_width/2);
+	ModuloRingbuffer ringbuf_x(RINGBUF_SIZE, -180*px_per_deg, 180*px_per_deg);
 	Ringbuffer ringbuf_y(RINGBUF_SIZE);
 	ModuloRingbuffer ringbuf_a(RINGBUF_SIZE, -180,180);
 	ModuloRingbuffer ringbuf_phi(RINGBUF_SIZE, -180,180);
@@ -627,7 +615,7 @@ int main(int argc, const char** argv)
 		ringbuf_theta2.put(navdata.theta);
 		ringbuf_theta.put(navdata.theta);
 
-		double xdiff = fixup_range( ringbuf_x.get() - px_per_deg*ringbuf_psi.get(), -virtual_canvas_width/2, virtual_canvas_width/2);
+		double xdiff = fixup_range( ringbuf_x.get() - px_per_deg*ringbuf_psi.get(), -180*px_per_deg, 180*px_per_deg);
 		double ydiff = ringbuf_y.get() + px_per_deg*ringbuf_theta.get();
 		double adiff = fixup_angle(ringbuf_a.get() - (-ringbuf_phi.get()));
 		
@@ -638,7 +626,7 @@ int main(int argc, const char** argv)
 		xdiff*=0.02;
 		ydiff*=0.02;
 		adiff*=0.5;
-		total_x = fixup_range(total_x - xdiff, -virtual_canvas_width/2, virtual_canvas_width/2);
+		total_x = fixup_range(total_x - xdiff, -180*px_per_deg, 180*px_per_deg);
 		total_y = total_y - ydiff;
 		total_rot = fixup_angle(total_rot - adiff);
 		ringbuf_x.add(-xdiff);
@@ -692,7 +680,7 @@ int main(int argc, const char** argv)
 		glUseProgram(drawOnCanvasProgram);
 		glActiveTexture(GL_TEXTURE0);
 		glBindTexture(GL_TEXTURE_2D, texVideo);
-		glUniform1f(uniCamYaw,(float)total_x/virtual_canvas_width*2*PI);
+		glUniform1f(uniCamYaw,(float)total_x/(360*px_per_deg)*2*PI);
 		glUniform1f(uniCamPitch,-(float)total_y/px_per_deg/180.*PI);
 		glUniform1f(uniCamRoll,-total_rot/180.*PI);
 		glDrawArrays(GL_TRIANGLES, 0, 6);
@@ -706,8 +694,6 @@ int main(int argc, const char** argv)
 		glBindTexture(GL_TEXTURE_2D, canvasTex);
 		/*glUniform1f(uniEyeYaw,3.1415+ringbuf_psi2.get()/180.*PI);
 		glUniform1f(uniEyePitch,-ringbuf_theta2.get()/180.*PI);
-		//glUniform1f(uniEyeYaw,3.1415+(float)total_x/virtual_canvas_width*2*PI);
-		//glUniform1f(uniEyePitch,(float)total_y/px_per_deg/180.*PI);
 		glUniform1f(uniEyeRoll,0);*/
 		glUniform1f(uniEyeYaw,oculus_yaw);
 		glUniform1f(uniEyePitch,-oculus_pitch);
@@ -752,35 +738,6 @@ int main(int argc, const char** argv)
 
 
 
-
-		printf("sh:  %i\t%i\t%f\n", shift_x, shift_y, angle);
-		printf("tot: %i\t%i\t%f\n", total_x, total_y, total_rot);
-
-		Mat rotmat = getRotationMatrix2D(Point2f(width/2,height/2), total_rot, scale_factor);
-		printf("dingskram %i\n", rotmat.type());
-		rotmat.at<double>(0,2) += total_x*scale_factor - width/2  + real_canvas_width/2;
-		rotmat.at<double>(1,2) += total_y*scale_factor - height/2 + real_canvas_height/2;
-
-		warpAffine(frame, screencontent_    , rotmat, Size(real_canvas_width, real_canvas_height));
-		warpAffine(white, screencontent_mask, rotmat, Size(real_canvas_width, real_canvas_height));
-
-		threshold(screencontent_mask, screencontent_mask, 254, 255, THRESH_BINARY);
-		erode(screencontent_mask, screencontent_mask, Mat::ones(2,2, CV_8U));
-		
-		Mat screencontent_mask2;
-		erode(screencontent_mask, screencontent_mask2, Mat::ones(30,200, CV_8U));
-		
-		screencontent = (screencontent & (~screencontent_mask2)) + (screencontent_ & screencontent_mask2);
-		Mat screencontent_displayed = (screencontent & (~screencontent_mask)) + (screencontent_ & screencontent_mask);
-
-		printf("%i/%i\n", screencontent.size().width, screencontent.size().height);
-		if (total_x > 0)
-			screencontent.colRange(0, (2*real_canvas_extra_width)) = screencontent.colRange( real_canvas_width - 2*real_canvas_extra_width, real_canvas_width);
-		else
-			
-			screencontent.colRange( real_canvas_width - 2*real_canvas_extra_width, real_canvas_width) = screencontent.colRange(0, (2*real_canvas_extra_width));
-
-		imshow("screencontent", screencontent_displayed);
 
 		oldgray = gray.clone();
 
