@@ -515,20 +515,20 @@ int main(int argc, const char** argv)
 	float px_per_deg = diag / 92.;
 
 
-	float total_x = 100/px_per_deg, total_y = 0;
-	float total_rot = 0.0;
+	float yaw_cam = 100/px_per_deg, pitch_cam = 0;
+	float roll_cam = 0.0;
 
 	Mat frame(Size(1280,720), CV_8UC3), frame_(Size(1280,720), CV_8UC3), gray, oldgray;
 
 	#define RINGBUF_SIZE 4
-	ModuloRingbuffer ringbuf_x(RINGBUF_SIZE, -180, 180);
-	Ringbuffer ringbuf_y(RINGBUF_SIZE);
-	ModuloRingbuffer ringbuf_a(RINGBUF_SIZE, -180,180);
-	ModuloRingbuffer ringbuf_phi(RINGBUF_SIZE, -180,180);
-	ModuloRingbuffer ringbuf_psi(RINGBUF_SIZE, -180,180);
-	ModuloRingbuffer ringbuf_psi2(40, -180,180);
-	ModuloRingbuffer ringbuf_theta2(40, -180,180);
-	ModuloRingbuffer ringbuf_theta(RINGBUF_SIZE, -180,180);
+	ModuloRingbuffer ringbuf_yaw_cam(RINGBUF_SIZE, -180, 180);
+	Ringbuffer ringbuf_pitch_cam(RINGBUF_SIZE);
+	ModuloRingbuffer ringbuf_roll_cam(RINGBUF_SIZE, -180,180);
+	ModuloRingbuffer ringbuf_roll_sensor(RINGBUF_SIZE, -180,180);
+	ModuloRingbuffer ringbuf_yaw_sensor(RINGBUF_SIZE, -180,180);
+	ModuloRingbuffer ringbuf_yaw_sensor_slow(40, -180,180);
+	ModuloRingbuffer ringbuf_pitch_sensor_slow(40, -180,180);
+	ModuloRingbuffer ringbuf_pitch_sensor(RINGBUF_SIZE, -180,180);
 
 
 	#define DELAY_SIZE 6
@@ -602,40 +602,41 @@ int main(int argc, const char** argv)
 			printf("no mat!\n");
 		}
 
-		total_x += ( cos(total_rot*PI/180.)*shift_x + sin(total_rot*PI/180.)*shift_y) / px_per_deg;
-		total_y += (-sin(total_rot*PI/180.)*shift_x + cos(total_rot*PI/180.)*shift_y) / px_per_deg;
-		total_rot = fixup_angle(total_rot+angle);
+		// TODO fixme proper rotation
+		yaw_cam += ( cos(roll_cam*PI/180.)*shift_x + sin(roll_cam*PI/180.)*shift_y) / px_per_deg;
+		pitch_cam += (-sin(roll_cam*PI/180.)*shift_x + cos(roll_cam*PI/180.)*shift_y) / px_per_deg;
+		roll_cam = fixup_angle(roll_cam+angle);
 
-		ringbuf_x.put(total_x);
-		ringbuf_y.put(total_y); //TODO
-		ringbuf_a.put(total_rot);
-		ringbuf_phi.put(navdata.phi);
-		ringbuf_psi.put(navdata.psi);
-		ringbuf_psi2.put(navdata.psi);
-		ringbuf_theta2.put(navdata.theta);
-		ringbuf_theta.put(navdata.theta);
+		ringbuf_yaw_cam.put(yaw_cam);
+		ringbuf_pitch_cam.put(pitch_cam);
+		ringbuf_roll_cam.put(roll_cam);
+		ringbuf_roll_sensor.put(navdata.phi);
+		ringbuf_yaw_sensor.put(navdata.psi);
+		ringbuf_yaw_sensor_slow.put(navdata.psi);
+		ringbuf_pitch_sensor_slow.put(navdata.theta);
+		ringbuf_pitch_sensor.put(navdata.theta);
 
-		double xdiff = fixup_range( ringbuf_x.get() - ringbuf_psi.get(), -180, 180);
-		double ydiff = ringbuf_y.get() + ringbuf_theta.get();
-		double adiff = fixup_angle(ringbuf_a.get() - (-ringbuf_phi.get()));
+		double yaw_diff = fixup_range( ringbuf_yaw_cam.get() - ringbuf_yaw_sensor.get(), -180, 180);
+		double pitch_diff = ringbuf_pitch_cam.get() + ringbuf_pitch_sensor.get();
+		double roll_diff = fixup_angle(ringbuf_roll_cam.get() - (-ringbuf_roll_sensor.get()));
 		
 		//if (fabs(xdiff) < px_per_deg) xdiff = 0.0;
 		//if (fabs(ydiff) < px_per_deg) ydiff = 0.0;
 		//if (fabs(adiff) < 2) adiff = 0.0;
 
-		xdiff*=0.02;
-		ydiff*=0.02;
-		adiff*=0.5;
-		total_x = fixup_range(total_x - xdiff, -180, 180);
-		total_y = total_y - ydiff;
-		total_rot = fixup_angle(total_rot - adiff);
-		ringbuf_x.add(-xdiff);
-		ringbuf_y.add(-ydiff);
-		ringbuf_a.add(-adiff);
+		yaw_diff*=0.02;
+		pitch_diff*=0.02;
+		roll_diff*=0.5;
+		yaw_cam = fixup_range(yaw_cam - yaw_diff, -180, 180);
+		pitch_cam = pitch_cam - pitch_diff;
+		roll_cam = fixup_angle(roll_cam - roll_diff);
+		ringbuf_yaw_cam.add(-yaw_diff);
+		ringbuf_pitch_cam.add(-pitch_diff);
+		ringbuf_roll_cam.add(-roll_diff);
 		
-		//total_x = navdata.psi;
-		//total_y = - navdata.theta * px_per_deg;
-		//total_rot = -navdata.phi;
+		//yaw_cam = navdata.psi;
+		//pitch_cam = - navdata.theta * px_per_deg;
+		//roll_cam = -navdata.phi;
 
 
 
@@ -680,9 +681,9 @@ int main(int argc, const char** argv)
 		glUseProgram(drawOnCanvasProgram);
 		glActiveTexture(GL_TEXTURE0);
 		glBindTexture(GL_TEXTURE_2D, texVideo);
-		glUniform1f(uniCamYaw,(float)total_x/180.*PI);
-		glUniform1f(uniCamPitch,-(float)total_y/180.*PI);
-		glUniform1f(uniCamRoll,-total_rot/180.*PI);
+		glUniform1f(uniCamYaw,(float)yaw_cam/180.*PI);
+		glUniform1f(uniCamPitch,-(float)pitch_cam/180.*PI);
+		glUniform1f(uniCamRoll,-roll_cam/180.*PI);
 		glDrawArrays(GL_TRIANGLES, 0, 6);
 
 
@@ -692,8 +693,8 @@ int main(int argc, const char** argv)
 		glUseProgram(drawFromCanvasProgram);
 		glActiveTexture(GL_TEXTURE0);
 		glBindTexture(GL_TEXTURE_2D, canvasTex);
-		/*glUniform1f(uniEyeYaw,3.1415+ringbuf_psi2.get()/180.*PI);
-		glUniform1f(uniEyePitch,-ringbuf_theta2.get()/180.*PI);
+		/*glUniform1f(uniEyeYaw,3.1415+ringbuf_yaw_sensor_slow.get()/180.*PI);
+		glUniform1f(uniEyePitch,-ringbuf_pitch_sensor_slow.get()/180.*PI);
 		glUniform1f(uniEyeRoll,0);*/
 		glUniform1f(uniEyeYaw,oculus_yaw);
 		glUniform1f(uniEyePitch,-oculus_pitch);
