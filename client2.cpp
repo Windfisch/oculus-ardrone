@@ -127,16 +127,6 @@ const char* drawFromCanvasFragmentSource =
 	//"	outColor = vec4(Texcoord,0,1.0);\n"
 	"}\n";
 
-const char* justDrawASpriteFragmentSource =
-	"#version 150\n"
-	"uniform sampler2D texVideo;\n"
-	"in vec2 Texcoord;\n"
-	"out vec4 outColor;\n"
-	"void main()\n"
-	"{\n"
-	"	outColor = texture(texVideo, Texcoord);\n"
-	"}\n";
-
 const char* oculusVertexSource =
 	"#version 150\n"
 	"in vec2 position;\n"
@@ -191,17 +181,6 @@ const char* oculusDummyFragmentSource =
 	"	outColor = texture(texVideo, Screencoord/vec2(2,2)+vec2(0.5,0.5));\n"
 	"}\n";
 
-const char* justDrawASpriteFragmentSourceGray =
-	"#version 150\n"
-	"uniform sampler2D texVideo;\n"
-	"in vec2 Texcoord;\n"
-	"out vec4 outColor;\n"
-	"void main()\n"
-	"{\n"
-	"	float gray = (texture(texVideo, Texcoord).r+ texture(texVideo, Texcoord).g + texture(texVideo, Texcoord).b)/3.;\n"
-	"	if (Texcoord.x < 0.5) gray=1.0-gray;\n"
-	"	outColor = vec4(gray,gray,gray,1.0);\n"
-	"}\n";
 
 
 float vertices[] = {
@@ -224,16 +203,6 @@ float vertices2[] = {
 	-1.f,  1.f,  1.f,0.f   // Vertex 1 (X, Y)
 };
 
-/*float vertices2[] = {
-	-1.f,  1.f,  0.f,1.f,  // Vertex 1 (X, Y)
-	 1.f,  1.f,  1.f,1.f,  // Vertex 2 (X, Y)
-	 1.f, -1.f,  1.f,0.f,  // Vertex 3 (X, Y)
-
-	 1.f, -1.f,  1.f,0.f,  // Vertex 3 (X, Y)
-	-1.f, -1.f,  0.f,0.f,  // Vertex 4 (X, Y)
-	-1.f,  1.f,  0.f,1.f   // Vertex 1 (X, Y)
-};*/
-
 float wholescreenVertices[] = {
 	-1.f, -1.f,  // Vertex 1 (X, Y)
 	 1.f, -1.f,  // Vertex 2 (X, Y)
@@ -244,51 +213,7 @@ float wholescreenVertices[] = {
 	-1.f, -1.f   // Vertex 1 (X, Y)
 };
 
-float quadVertices[] = {
-	-1.f, -1.f,  0.f,0.f,  // Vertex 1 (X, Y)
-	 1.f, -1.f,  1.f,0.f,  // Vertex 2 (X, Y)
-	 1.f,  1.f, 1.f,1.f,  // Vertex 3 (X, Y)
 
-	 1.f,  1.f, 1.f,1.f,  // Vertex 3 (X, Y)
-	-1.f,  1.f,  0.f,1.f,  // Vertex 4 (X, Y)
-	-1.f, -1.f,  0.f,0.f  // Vertex 1 (X, Y)
-};
-
-
-void calcVerticesRotated(int xshift, int yshift, float angle, float* v)
-{
-	Point2f pt;
-	pt = Point2f( -cos(angle)*1280./2 + sin(angle)*720./2, +sin(angle)*1280./2 + cos(angle)*720./2 );
-	v[0]=v[20]=(float) ( pt.x + xshift) / PX_PER_DEG / CANVAS_XDEG * 2;
-	v[1]=v[21]=(float) ( pt.y + yshift) / PX_PER_DEG / CANVAS_YDEG * 2;
-	v[8]=v[12]=(float) (-pt.x + xshift) / PX_PER_DEG / CANVAS_XDEG * 2;
-	v[9]=v[13]=(float) (-pt.y + yshift) / PX_PER_DEG / CANVAS_YDEG * 2;
-
-	pt = Point2f( cos(angle)*1280./2 + sin(angle)*720./2, -sin(angle)*1280./2 + cos(angle)*720./2 );
-	v[4] =(float) ( pt.x + xshift) / PX_PER_DEG / CANVAS_XDEG * 2;
-	v[5] =(float) ( pt.y + yshift)/ PX_PER_DEG / CANVAS_YDEG * 2;
-	v[16]=(float) (-pt.x + xshift)/ PX_PER_DEG / CANVAS_XDEG * 2;
-	v[17]=(float) (-pt.y + yshift) / PX_PER_DEG / CANVAS_YDEG * 2;
-}
-
-void calcVerticesRotated2(float xshift, float yshift, float angle, float* v)
-{
-	v+=2;
-	Point2f pt;
-	float xd = EYE_XDEG;
-	float yd = -EYE_XDEG * EYE_HEIGHT / EYE_WIDTH;
-	pt = Point2f( -cos(angle)*xd/2 + sin(angle)*yd/2, +sin(angle)*xd/2 + cos(angle)*yd/2 );
-	v[0]=v[20]=(float) ( pt.x + xshift) / CANVAS_XDEG + 0.5;
-	v[1]=v[21]=(float) ( pt.y + yshift) / CANVAS_YDEG + 0.5;
-	v[8]=v[12]=(float) (-pt.x + xshift) / CANVAS_XDEG + 0.5;
-	v[9]=v[13]=(float) (-pt.y + yshift) / CANVAS_YDEG + 0.5;
-
-	pt = Point2f( cos(angle)*xd/2 + sin(angle)*yd/2, -sin(angle)*xd/2 + cos(angle)*yd/2 );
-	v[4] =(float) ( pt.x + xshift) / CANVAS_XDEG + 0.5;
-	v[5] =(float) ( pt.y + yshift) / CANVAS_YDEG + 0.5;
-	v[16]=(float) (-pt.x + xshift) / CANVAS_XDEG + 0.5;
-	v[17]=(float) (-pt.y + yshift) / CANVAS_YDEG + 0.5;
-}
 
 
 void compileShaderProgram(const GLchar* vertSrc, const GLchar* fragSrc, GLuint& vertexShader, GLuint& fragmentShader, GLuint& shaderProgram)
@@ -343,28 +268,6 @@ GLuint newEyeShaderProgram(GLuint vao, GLuint vbo)
 {
 	GLuint vertexShader, fragmentShader, shaderProgram;
 	compileShaderProgram(justDrawASpriteVertexSource, drawFromCanvasFragmentSource, vertexShader, fragmentShader, shaderProgram);
-
-
-	glBindVertexArray(vao);
-	glBindBuffer(GL_ARRAY_BUFFER, vbo);
-	
-	// set up shaders
-	GLint posAttrib = glGetAttribLocation(shaderProgram, "position");
-	glEnableVertexAttribArray(posAttrib);
-	glVertexAttribPointer(posAttrib, 2, GL_FLOAT, GL_FALSE, 4*sizeof(float), 0);
-
-
-	GLint texAttrib = glGetAttribLocation(shaderProgram, "texcoord");
-	glEnableVertexAttribArray(texAttrib);
-	glVertexAttribPointer(texAttrib, 2, GL_FLOAT, GL_FALSE, 4*sizeof(float), (void*)(2*sizeof(float)));
-
-	return shaderProgram;
-}
-
-GLuint justDrawASpriteShaderProgram(GLuint vao, GLuint vbo, bool gray=false)
-{
-	GLuint vertexShader, fragmentShader, shaderProgram;
-	compileShaderProgram(justDrawASpriteVertexSource, gray? justDrawASpriteFragmentSourceGray : justDrawASpriteFragmentSource, vertexShader, fragmentShader, shaderProgram);
 
 
 	glBindVertexArray(vao);
@@ -524,17 +427,15 @@ int main(int argc, const char** argv)
 	GLFWwindow* window = initOpenGL();
 
 
-	GLuint vaoCanvas, vaoEye, vaoQuad, vaoWholescreenQuad;
+	GLuint vaoCanvas, vaoEye, vaoWholescreenQuad;
 	glGenVertexArrays(1, &vaoCanvas);
 	glGenVertexArrays(1, &vaoEye);
-	glGenVertexArrays(1, &vaoQuad);
 	glGenVertexArrays(1, &vaoWholescreenQuad);
 
 
-	GLuint vboCanvas, vboEye, vboQuad, vboWholescreenQuad;
+	GLuint vboCanvas, vboEye, vboWholescreenQuad;
 	glGenBuffers(1, &vboCanvas);
 	glGenBuffers(1, &vboEye);
-	glGenBuffers(1, &vboQuad);
 	glGenBuffers(1, &vboWholescreenQuad);
 
 	glBindBuffer(GL_ARRAY_BUFFER, vboCanvas);
@@ -542,9 +443,6 @@ int main(int argc, const char** argv)
 
 	glBindBuffer(GL_ARRAY_BUFFER, vboEye);
 	glBufferData(GL_ARRAY_BUFFER, sizeof(vertices2), vertices2, GL_STATIC_DRAW);
-
-	glBindBuffer(GL_ARRAY_BUFFER, vboQuad);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(quadVertices), quadVertices, GL_STATIC_DRAW);
 
 	glBindBuffer(GL_ARRAY_BUFFER, vboWholescreenQuad);
 	glBufferData(GL_ARRAY_BUFFER, sizeof(wholescreenVertices), wholescreenVertices, GL_STATIC_DRAW);
@@ -554,15 +452,15 @@ int main(int argc, const char** argv)
 
 	
 	// compile shaders
-	GLuint shaderProgram = justDrawASpriteShaderProgram(vaoCanvas, vboCanvas);
-	GLuint quadShaderProgram = justDrawASpriteShaderProgram(vaoQuad, vboQuad);
 	GLuint oculusShaderProgram = newOculusShaderProgram(vaoWholescreenQuad, vboWholescreenQuad);
 	GLint uniAberrR = glGetUniformLocation(oculusShaderProgram, "aberr_r");
 	GLint uniAberrB = glGetUniformLocation(oculusShaderProgram, "aberr_b");
+	
 	GLuint drawOnCanvasProgram = newCanvasShaderProgram(vaoCanvas, vboCanvas);
 	GLint uniCamYaw = glGetUniformLocation(drawOnCanvasProgram, "cam_yaw");
 	GLint uniCamPitch = glGetUniformLocation(drawOnCanvasProgram, "cam_pitch");
 	GLint uniCamRoll = glGetUniformLocation(drawOnCanvasProgram, "cam_roll");
+	
 	GLuint drawFromCanvasProgram = newEyeShaderProgram(vaoEye, vboEye);
 	GLint uniEyeYaw = glGetUniformLocation(drawFromCanvasProgram, "eye_yaw");
 	GLint uniEyePitch = glGetUniformLocation(drawFromCanvasProgram, "eye_pitch");
@@ -592,8 +490,8 @@ int main(int argc, const char** argv)
 
 
 
-glEnable (GL_BLEND);
-glBlendFunc (GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+	glEnable (GL_BLEND);
+	glBlendFunc (GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
 
 
@@ -786,11 +684,6 @@ glBlendFunc (GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 		Mat frame_gl = frame.clone();
 		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, frame_gl.size().width, frame_gl.size().height, 0, GL_RGB, GL_UNSIGNED_BYTE, frame_gl.ptr<unsigned char>(0));
 
-
-		calcVerticesRotated2(ringbuf_psi2.get(),10,0,quadVertices);
-
-		glBindBuffer(GL_ARRAY_BUFFER, vboQuad);
-		glBufferData(GL_ARRAY_BUFFER, sizeof(quadVertices), quadVertices, GL_STATIC_DRAW);
 
 
 		glBindFramebuffer(GL_FRAMEBUFFER, canvasFB);
