@@ -588,6 +588,7 @@ glBlendFunc (GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 	ModuloRingbuffer ringbuf_phi(RINGBUF_SIZE, -180,180);
 	ModuloRingbuffer ringbuf_psi(RINGBUF_SIZE, -180,180);
 	ModuloRingbuffer ringbuf_psi2(40, -180,180);
+	ModuloRingbuffer ringbuf_theta2(40, -180,180);
 	ModuloRingbuffer ringbuf_theta(RINGBUF_SIZE, -180,180);
 
 
@@ -661,6 +662,7 @@ glBlendFunc (GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 		ringbuf_phi.put(navdata.phi);
 		ringbuf_psi.put(navdata.psi);
 		ringbuf_psi2.put(navdata.psi);
+		ringbuf_theta2.put(navdata.theta);
 		ringbuf_theta.put(navdata.theta);
 
 		double xdiff = fixup_range( ringbuf_x.get() - px_per_deg*ringbuf_psi.get(), -virtual_canvas_width/2, virtual_canvas_width/2);
@@ -671,8 +673,8 @@ glBlendFunc (GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 		//if (fabs(ydiff) < px_per_deg) ydiff = 0.0;
 		//if (fabs(adiff) < 2) adiff = 0.0;
 
-		xdiff*=0.5;
-		ydiff*=0.5;
+		xdiff*=0.02;
+		ydiff*=0.02;
 		adiff*=0.5;
 		total_x = fixup_range(total_x - xdiff, -virtual_canvas_width/2, virtual_canvas_width/2);
 		total_y = total_y - ydiff;
@@ -725,8 +727,10 @@ glBlendFunc (GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 		glUseProgram(drawFromCanvasProgram);
 		glActiveTexture(GL_TEXTURE0);
 		glBindTexture(GL_TEXTURE_2D, canvasTex);
-		glUniform1f(uniEyeYaw,3.1415+(float)total_x/virtual_canvas_width*2*PI);
-		glUniform1f(uniEyePitch,(float)total_y/px_per_deg/180.*PI);
+		glUniform1f(uniEyeYaw,3.1415+ringbuf_psi2.get()/180.*PI);
+		glUniform1f(uniEyePitch,-ringbuf_theta2.get()/180.*PI);
+		//glUniform1f(uniEyeYaw,3.1415+(float)total_x/virtual_canvas_width*2*PI);
+		//glUniform1f(uniEyePitch,(float)total_y/px_per_deg/180.*PI);
 		glUniform1f(uniEyeRoll,0);
 		glDrawArrays(GL_TRIANGLES, 0, 6);
 
