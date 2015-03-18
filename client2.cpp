@@ -92,9 +92,9 @@ const char* drawOnCanvasFragmentSource =
 	"	}\n"
 	"	else\n"
 	"		outColor = vec4(0.0,0.0,0.0,0.00);"
-	"	float xxx = Texcoord.x/3.141592654*180/10+100;"
-	"	float yyy = Texcoord.y/3.141592654*180/10+100;"
-	"	if ( (abs(xxx- int(xxx)) < 0.01) || (abs(yyy- int(yyy)) <.01)) outColor = vec4(1,1,1,1);"
+	//"	float xxx = Texcoord.x/3.141592654*180/10+100;"
+	//"	float yyy = Texcoord.y/3.141592654*180/10+100;"
+	//"	if ( (abs(xxx- int(xxx)) < 0.01) || (abs(yyy- int(yyy)) <.01)) outColor = vec4(1,1,1,1);"
 	//"	else outColor = vec4(0,0,0,1);"
 	"}\n";
 
@@ -621,6 +621,8 @@ void* video_fetcher_thread(void* ptr)
 		}
 		
 		oldgray = gray.clone();
+
+		usleep(40000);
 	}
 	return NULL;
 }
