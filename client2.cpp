@@ -308,6 +308,8 @@ GLFWwindow* initOpenGL()
 
 	glewExperimental = GL_TRUE;
 	glewInit();
+
+	glfwSwapInterval(1); // enable vsync
 	
 	return window;
 }
@@ -406,6 +408,23 @@ int init_ohmd(ohmd_context** ctx_, ohmd_device** hmd_)
 	return 0;
 }
 
+void showFPS()
+{
+	static double lastTime = 0;
+	static int nbFrames = 0;
+	static float fps=1337;
+
+     // Measure speed
+     double currentTime = glfwGetTime();
+     nbFrames++;
+     if ( currentTime - lastTime >= 1.0 ){ // If last cout was more than 1 sec ago
+	fps = double(nbFrames);
+         nbFrames = 0;
+         lastTime += 1.0;
+     printf("FPS: %f\n",fps);
+     }
+}
+
 
 float deadzone(float val, float dead)
 {
@@ -425,6 +444,7 @@ float deadzone(float val, float dead)
 
 int main(int argc, const char** argv)
 {
+	bool no_oculus = (argc>=2 && (strcmp(argv[1],"--no-oculus")==0));
 	GLFWwindow* window = initOpenGL();
 
 
@@ -500,7 +520,12 @@ int main(int argc, const char** argv)
 
 	ohmd_context* my_ohmd_context;
 	ohmd_device* my_ohmd_device;
-	if (init_ohmd(&my_ohmd_context, &my_ohmd_device)) return 1;
+	if (no_oculus || init_ohmd(&my_ohmd_context, &my_ohmd_device))
+	{
+		printf("no oculus rift!\n");
+		my_ohmd_device=0;
+		my_ohmd_context=0;
+	}
 
 
 
@@ -624,10 +649,6 @@ int main(int argc, const char** argv)
 		yaw_diff = deadzone(yaw_diff, 1.0);
 		pitch_diff = deadzone(pitch_diff, 1.0);
 		roll_diff = deadzone(roll_diff, 1.0);
-		
-		//if (fabs(xdiff) < px_per_deg) xdiff = 0.0;
-		//if (fabs(ydiff) < px_per_deg) ydiff = 0.0;
-		//if (fabs(adiff) < 2) adiff = 0.0;
 
 		yaw_diff*=0.1;
 		pitch_diff*=0.1;
@@ -645,26 +666,6 @@ int main(int argc, const char** argv)
 
 
 
-
-
-
-
-
-
-		ohmd_ctx_update(my_ohmd_context);
-
-		float quat[4],quat_[4];
-		ohmd_device_getf(my_ohmd_device, OHMD_ROTATION_QUAT, quat_);
-		quat[0]=quat_[0];
-		quat[1]=quat_[1];
-		quat[2]=quat_[3];
-		quat[3]=quat_[2];
-		
-		float oculus_yaw = atan2( 2.0* (quat[1]*quat[2]+quat[0]*quat[3]), (quat[0]*quat[0]+quat[1]*quat[1]-quat[2]*quat[2]-quat[3]*quat[3]) );
-		float oculus_pitch = asin(2.0*(quat[0]*quat[2]-quat[1]*quat[3]));
-		float oculus_roll = -atan2(2.0*(quat[2]*quat[3]+quat[0]*quat[1]), -(quat[0]*quat[0]-quat[1]*quat[1]-quat[2]*quat[2]+quat[3]*quat[3]));
-
-		printf("oculus yaw, pitch, roll = \t%f\t%f\t%f\n", oculus_yaw*180/PI, oculus_pitch*180/PI, oculus_roll*180/PI);
 
 
 
@@ -692,15 +693,41 @@ int main(int argc, const char** argv)
 		glDrawArrays(GL_TRIANGLES, 0, 6);
 
 
+
+		float oculus_yaw;
+		float oculus_pitch;
+		float oculus_roll;
+		if (my_ohmd_context)
+		{
+			ohmd_ctx_update(my_ohmd_context);
+
+			float quat[4],quat_[4];
+			ohmd_device_getf(my_ohmd_device, OHMD_ROTATION_QUAT, quat_);
+			quat[0]=quat_[0];
+			quat[1]=quat_[1];
+			quat[2]=quat_[3];
+			quat[3]=quat_[2];
+			
+			oculus_yaw = atan2( 2.0* (quat[1]*quat[2]+quat[0]*quat[3]), (quat[0]*quat[0]+quat[1]*quat[1]-quat[2]*quat[2]-quat[3]*quat[3]) );
+			oculus_pitch = asin(2.0*(quat[0]*quat[2]-quat[1]*quat[3]));
+			oculus_roll = -atan2(2.0*(quat[2]*quat[3]+quat[0]*quat[1]), -(quat[0]*quat[0]-quat[1]*quat[1]-quat[2]*quat[2]+quat[3]*quat[3]));
+
+			//printf("oculus yaw, pitch, roll = \t%f\t%f\t%f\n", oculus_yaw*180/PI, oculus_pitch*180/PI, oculus_roll*180/PI);
+		}
+		else
+		{
+			oculus_yaw = PI + ringbuf_yaw_sensor_slow.get()/180.*PI;
+			oculus_pitch = ringbuf_pitch_sensor_slow.get()/180.*PI;
+			oculus_roll = 0.1;
+		}
+
+
 		glBindFramebuffer(GL_FRAMEBUFFER, eyeFB);
 		glViewport(0,0,EYE_WIDTH,EYE_HEIGHT);
 		glBindVertexArray(vaoEye);
 		glUseProgram(drawFromCanvasProgram);
 		glActiveTexture(GL_TEXTURE0);
 		glBindTexture(GL_TEXTURE_2D, canvasTex);
-		/*glUniform1f(uniEyeYaw,3.1415+ringbuf_yaw_sensor_slow.get()/180.*PI);
-		glUniform1f(uniEyePitch,-ringbuf_pitch_sensor_slow.get()/180.*PI);
-		glUniform1f(uniEyeRoll,0);*/
 		glUniform1f(uniEyeYaw,oculus_yaw);
 		glUniform1f(uniEyePitch,-oculus_pitch);
 		glUniform1f(uniEyeRoll,-oculus_roll);
@@ -727,8 +754,9 @@ int main(int argc, const char** argv)
 		if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
 			glfwSetWindowShouldClose(window, GL_TRUE);
 
-		imshow("dingens",frame_);
+		showFPS();
 
+		//imshow("dingens",frame_);
 
 
 
