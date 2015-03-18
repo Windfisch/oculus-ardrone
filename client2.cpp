@@ -10,6 +10,8 @@
 #include <string.h>
 #include <sys/un.h>
 #include <time.h>
+#include <pthread.h>
+#include <semaphore.h>
 
 #include <opencv2/opencv.hpp>
 #include "lib.h"
@@ -459,9 +461,178 @@ float deadzone(float val, float dead)
 }
 
 
+pthread_mutex_t my_mutex;
+sem_t oculus_thread_go;
+
+ModuloRingbuffer ringbuf_yaw_sensor_slow(40, -180,180);
+ModuloRingbuffer ringbuf_pitch_sensor_slow(40, -180,180);
+float yaw_cam_global, pitch_cam_global, roll_cam_global;
+Mat frame_global;
+
+void* video_fetcher_thread(void* ptr)
+{
+	#define RINGBUF_SIZE 4
+	ModuloRingbuffer ringbuf_yaw_cam(RINGBUF_SIZE, -180, 180);
+	Ringbuffer ringbuf_pitch_cam(RINGBUF_SIZE);
+	ModuloRingbuffer ringbuf_roll_cam(RINGBUF_SIZE, -180,180);
+	ModuloRingbuffer ringbuf_roll_sensor(RINGBUF_SIZE, -180,180);
+	ModuloRingbuffer ringbuf_yaw_sensor(RINGBUF_SIZE, -180,180);
+	ModuloRingbuffer ringbuf_pitch_sensor(RINGBUF_SIZE, -180,180);
+
+
+	#define DELAY_SIZE 6
+	Ringbuffer delay_phi(DELAY_SIZE);   // should delay sensor data by ~0.2sec
+	Ringbuffer delay_psi(DELAY_SIZE);   // that's the amount the video lags behind
+	Ringbuffer delay_theta(DELAY_SIZE); // the sensor data
+	
+	int adjust_phi=10;
+	
+	
+	DroneConnection drone(SOCKETPATH);
+	navdata_t navdata;
+
+	Mat map1(Size(width,height), CV_32FC1), map2(Size(width,height), CV_32FC1);
+	calc_undistort_maps(80, 1280,720, map1, map2);
+
+	float diag = sqrt(1280*1280+720*720);
+	float px_per_deg = diag / 92.;
+
+
+	float yaw_cam = 100/px_per_deg;
+	float pitch_cam = 0;
+	float roll_cam = 0.0;
+
+	Mat frame(Size(1280,720), CV_8UC3), frame_(Size(1280,720), CV_8UC3), gray, oldgray;
+
+
+
+	for (int i=0; i<400;i++)
+	{
+		drone.get(frame_, &navdata);
+		remap(frame_, frame, map1, map2, INTER_LINEAR);
+		cvtColor(frame, oldgray, COLOR_BGR2GRAY);
+	}
+
+	bool first_time = true;
+	while(true)
+	{
+		drone.get(frame_, &navdata);
+		delay_phi.put(navdata.phi);
+		delay_psi.put(navdata.psi);
+		delay_theta.put(navdata.theta);
+		navdata.phi = delay_phi.front();
+		navdata.psi = delay_psi.front();
+		navdata.theta = delay_theta.front();
+
+		navdata.phi = fixup_angle(navdata.phi + adjust_phi);
+
+		/*
+		if (key=='q') adjust_phi++;
+		if (key=='w') adjust_phi--;
+		
+		if (key=='a') aberr_r+=0.001;
+		if (key=='z') aberr_r-=0.001;
+		if (key=='s') aberr_b+=0.001;
+		if (key=='x') aberr_b-=0.001;
+		*/
+
+		//printf("aberr_r/b = \t%f\t%f\n",aberr_r,aberr_b);
+		
+		//for (int i=0; i<1280; i+=50) frame_.col(i)=Scalar(0,255,255);
+		//for (int i=0; i<720; i+=50) frame_.row(i)=Scalar(0,255,255);
+
+		remap(frame_, frame, map1, map2, INTER_LINEAR);
+		cvtColor(frame, gray, COLOR_BGR2GRAY);
+		
+
+
+
+
+
+
+
+
+		Mat mat = estimateRigidTransform(gray, oldgray, false);
+
+		float angle; float shift_x, shift_y;
+		if (mat.total() > 0)
+		{
+			angle = atan2(mat.at<double>(0,1), mat.at<double>(0,0)) / PI * 180.;
+			shift_x = mat.at<double>(0,2) - width/2 + (mat.at<double>(0,0)*width/2 + mat.at<double>(0,1)*height/2);
+			shift_y = mat.at<double>(1,2) - height/2 + (mat.at<double>(1,0)*width/2 + mat.at<double>(1,1)*height/2);
+		}
+		else
+		{
+			angle = 0;
+			shift_x = 0;
+			shift_y = 0;
+			printf("no mat!\n");
+		}
+
+		// TODO fixme proper rotation
+		yaw_cam += ( cos(roll_cam*PI/180.)*shift_x + sin(roll_cam*PI/180.)*shift_y) / px_per_deg;
+		pitch_cam += (-sin(roll_cam*PI/180.)*shift_x + cos(roll_cam*PI/180.)*shift_y) / px_per_deg;
+		roll_cam = fixup_angle(roll_cam+angle);
+
+		ringbuf_yaw_cam.put(yaw_cam);
+		ringbuf_pitch_cam.put(pitch_cam);
+		ringbuf_roll_cam.put(roll_cam);
+		ringbuf_roll_sensor.put(navdata.phi);
+		ringbuf_yaw_sensor.put(navdata.psi);
+		ringbuf_pitch_sensor.put(navdata.theta);
+
+		double yaw_diff = fixup_range( ringbuf_yaw_cam.get() - ringbuf_yaw_sensor.get(), -180, 180);
+		double pitch_diff = ringbuf_pitch_cam.get() + ringbuf_pitch_sensor.get();
+		double roll_diff = fixup_angle(ringbuf_roll_cam.get() - (-ringbuf_roll_sensor.get()));
+
+		yaw_diff = deadzone(yaw_diff, 1.0);
+		pitch_diff = deadzone(pitch_diff, 1.0);
+		roll_diff = deadzone(roll_diff, 1.0);
+
+		yaw_diff*=0.1;
+		pitch_diff*=0.1;
+		roll_diff*=0.5;
+		yaw_cam = fixup_range(yaw_cam - yaw_diff, -180, 180);
+		pitch_cam = pitch_cam - pitch_diff;
+		roll_cam = fixup_angle(roll_cam - roll_diff);
+		ringbuf_yaw_cam.add(-yaw_diff);
+		ringbuf_pitch_cam.add(-pitch_diff);
+		ringbuf_roll_cam.add(-roll_diff);
+		
+		//yaw_cam = navdata.psi;
+		//pitch_cam = - navdata.theta * px_per_deg;
+		//roll_cam = -navdata.phi;
+		
+
+		pthread_mutex_lock(&my_mutex);
+		yaw_cam_global = yaw_cam;
+		pitch_cam_global = pitch_cam;
+		roll_cam_global = roll_cam;
+		frame_global = frame.clone();
+
+		ringbuf_yaw_sensor_slow.put(navdata.psi);
+		ringbuf_pitch_sensor_slow.put(navdata.theta);
+		pthread_mutex_unlock(&my_mutex);
+
+		if (first_time)
+		{
+			sem_post(&oculus_thread_go);
+			first_time=false;
+		}
+		
+		oldgray = gray.clone();
+	}
+	return NULL;
+}
+
 int main(int argc, const char** argv)
 {
 	bool no_oculus = (argc>=2 && (strcmp(argv[1],"--no-oculus")==0));
+
+	pthread_mutex_init(&my_mutex, NULL);
+	sem_init(&oculus_thread_go, 0, 0);
+
+
 	GLFWwindow* window = initOpenGL();
 
 
@@ -545,50 +716,13 @@ int main(int argc, const char** argv)
 	}
 
 
+	pthread_t video_thread;
+	pthread_create(&video_thread, NULL, video_fetcher_thread, NULL);
+	sem_wait(&oculus_thread_go);
 
 
-
-	DroneConnection drone(SOCKETPATH);
-	navdata_t navdata;
-
-	Mat map1(Size(width,height), CV_32FC1), map2(Size(width,height), CV_32FC1);
-	calc_undistort_maps(80, 1280,720, map1, map2);
-
-	float diag = sqrt(1280*1280+720*720);
-	float px_per_deg = diag / 92.;
-
-
-	float yaw_cam = 100/px_per_deg, pitch_cam = 0;
-	float roll_cam = 0.0;
-
-	Mat frame(Size(1280,720), CV_8UC3), frame_(Size(1280,720), CV_8UC3), gray, oldgray;
-
-	#define RINGBUF_SIZE 4
-	ModuloRingbuffer ringbuf_yaw_cam(RINGBUF_SIZE, -180, 180);
-	Ringbuffer ringbuf_pitch_cam(RINGBUF_SIZE);
-	ModuloRingbuffer ringbuf_roll_cam(RINGBUF_SIZE, -180,180);
-	ModuloRingbuffer ringbuf_roll_sensor(RINGBUF_SIZE, -180,180);
-	ModuloRingbuffer ringbuf_yaw_sensor(RINGBUF_SIZE, -180,180);
-	ModuloRingbuffer ringbuf_yaw_sensor_slow(40, -180,180);
-	ModuloRingbuffer ringbuf_pitch_sensor_slow(40, -180,180);
-	ModuloRingbuffer ringbuf_pitch_sensor(RINGBUF_SIZE, -180,180);
-
-
-	#define DELAY_SIZE 6
-	Ringbuffer delay_phi(DELAY_SIZE);   // should delay sensor data by ~0.2sec
-	Ringbuffer delay_psi(DELAY_SIZE);   // that's the amount the video lags behind
-	Ringbuffer delay_theta(DELAY_SIZE); // the sensor data
-
-
-	for (int i=0; i<400;i++)
-	{
-		drone.get(frame_, &navdata);
-		remap(frame_, frame, map1, map2, INTER_LINEAR);
-		cvtColor(frame, oldgray, COLOR_BGR2GRAY);
-	}
 
 	char key;
-	int adjust_phi=10;
 	float aberr_r=0.989, aberr_b=1.021;
 	int i=-1;
 	while (key=' ')
@@ -597,35 +731,6 @@ int main(int argc, const char** argv)
 		i++;
 		//printf("\033[H");
 
-		if (i%10==0)
-		{
-		drone.get(frame_, &navdata);
-		delay_phi.put(navdata.phi);
-		delay_psi.put(navdata.psi);
-		delay_theta.put(navdata.theta);
-		navdata.phi = delay_phi.front();
-		navdata.psi = delay_psi.front();
-		navdata.theta = delay_theta.front();
-
-		navdata.phi = fixup_angle(navdata.phi + adjust_phi);
-
-		if (key=='q') adjust_phi++;
-		if (key=='w') adjust_phi--;
-		
-		if (key=='a') aberr_r+=0.001;
-		if (key=='z') aberr_r-=0.001;
-		if (key=='s') aberr_b+=0.001;
-		if (key=='x') aberr_b-=0.001;
-
-		//printf("aberr_r/b = \t%f\t%f\n",aberr_r,aberr_b);
-		
-		//for (int i=0; i<1280; i+=50) frame_.col(i)=Scalar(0,255,255);
-		//for (int i=0; i<720; i+=50) frame_.row(i)=Scalar(0,255,255);
-
-		remap(frame_, frame, map1, map2, INTER_LINEAR);
-		cvtColor(frame, gray, COLOR_BGR2GRAY);
-		}
-		
 
 
 
@@ -634,76 +739,16 @@ int main(int argc, const char** argv)
 
 
 
-		Mat mat = estimateRigidTransform(gray, oldgray, false);
-
-		float angle; int shift_x, shift_y;
-		if (mat.total() > 0)
-		{
-			angle = atan2(mat.at<double>(0,1), mat.at<double>(0,0)) / PI * 180.;
-			shift_x = mat.at<double>(0,2) - width/2 + (mat.at<double>(0,0)*width/2 + mat.at<double>(0,1)*height/2);
-			shift_y = mat.at<double>(1,2) - height/2 + (mat.at<double>(1,0)*width/2 + mat.at<double>(1,1)*height/2);
-		}
-		else
-		{
-			angle = 0;
-			shift_x = 0;
-			shift_y = 0;
-			printf("no mat!\n");
-		}
-
-		// TODO fixme proper rotation
-		yaw_cam += ( cos(roll_cam*PI/180.)*shift_x + sin(roll_cam*PI/180.)*shift_y) / px_per_deg;
-		pitch_cam += (-sin(roll_cam*PI/180.)*shift_x + cos(roll_cam*PI/180.)*shift_y) / px_per_deg;
-		roll_cam = fixup_angle(roll_cam+angle);
-
-		ringbuf_yaw_cam.put(yaw_cam);
-		ringbuf_pitch_cam.put(pitch_cam);
-		ringbuf_roll_cam.put(roll_cam);
-		ringbuf_roll_sensor.put(navdata.phi);
-		ringbuf_yaw_sensor.put(navdata.psi);
-		ringbuf_yaw_sensor_slow.put(navdata.psi);
-		ringbuf_pitch_sensor_slow.put(navdata.theta);
-		ringbuf_pitch_sensor.put(navdata.theta);
-
-		double yaw_diff = fixup_range( ringbuf_yaw_cam.get() - ringbuf_yaw_sensor.get(), -180, 180);
-		double pitch_diff = ringbuf_pitch_cam.get() + ringbuf_pitch_sensor.get();
-		double roll_diff = fixup_angle(ringbuf_roll_cam.get() - (-ringbuf_roll_sensor.get()));
-
-		yaw_diff = deadzone(yaw_diff, 1.0);
-		pitch_diff = deadzone(pitch_diff, 1.0);
-		roll_diff = deadzone(roll_diff, 1.0);
-
-		yaw_diff*=0.1;
-		pitch_diff*=0.1;
-		roll_diff*=0.5;
-		yaw_cam = fixup_range(yaw_cam - yaw_diff, -180, 180);
-		pitch_cam = pitch_cam - pitch_diff;
-		roll_cam = fixup_angle(roll_cam - roll_diff);
-		ringbuf_yaw_cam.add(-yaw_diff);
-		ringbuf_pitch_cam.add(-pitch_diff);
-		ringbuf_roll_cam.add(-roll_diff);
-		
-		//yaw_cam = navdata.psi;
-		//pitch_cam = - navdata.theta * px_per_deg;
-		//roll_cam = -navdata.phi;
+		pthread_mutex_lock(&my_mutex);
+		Mat frame_gl = frame_global.clone();
+		float yaw_cam = yaw_cam_global;
+		float pitch_cam = pitch_cam_global;
+		float roll_cam = roll_cam_global;
+		pthread_mutex_unlock(&my_mutex);
 
 
-
-
-
-
-
-
-
-
-
-
-		if (i%1==0)
-		{
 		glBindTexture(GL_TEXTURE_2D, texVideo);
-		Mat frame_gl = frame.clone();
 		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, frame_gl.size().width, frame_gl.size().height, 0, GL_RGB, GL_UNSIGNED_BYTE, frame_gl.ptr<unsigned char>(0));
-		}
 
 		
 		if(i!=0) setDrawOnCanvasRange((float)yaw_cam/180.*PI,-(float)pitch_cam/180.*PI,80./180.*PI,45/180.*PI);
@@ -803,7 +848,6 @@ int main(int argc, const char** argv)
 
 
 
-		oldgray = gray.clone();
 
 
 	}
