@@ -1,5 +1,8 @@
-tippen sie
-
 git submodule update --init
+make
 
-denn es ist sehr gut.
+python server2.py (have a video in place!)
+OR python server.py (have a ar drone connected)
+
+./client2 [--no-oculus]
+
