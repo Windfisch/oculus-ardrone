@@ -74,10 +74,8 @@ const char* drawOnCanvasFragmentSource =
 	"{\n"
 	"	// cam_rot rotates a pixel FROM world TO cam frame\n"
 	"	mat3 cam_rot = transpose(mat3(1,0,0,  0,cos(cam_roll),sin(cam_roll), 0,-sin(cam_roll),cos(cam_roll))) * transpose(mat3(cos(cam_pitch),0,-sin(cam_pitch), 0,1,0, sin(cam_pitch),0,cos(cam_pitch))) * transpose(mat3(cos(cam_yaw),sin(cam_yaw),0,-sin(cam_yaw),cos(cam_yaw),0,0,0,1));\n"
-//	"	mat3 cam_rot = transpose(mat3(1,0,0,  0,1,0,  0,0,1));\n"
 	"	// Texcoord.xy is yaw/pitch in the unit sphere\n"
 	"	vec3 point_in_world_frame = vec3( cos(Texcoord.x)*cos(Texcoord.y), sin(Texcoord.x)*cos(Texcoord.y), -sin(Texcoord.y) );\n"
-//	"	if ((0.2< abs(point_in_world_frame.z)) && (abs(point_in_world_frame.z) < 0.3)) outColor=vec4(1,1,1,1); else outColor=vec4(0,0,0,1); return;"
 	"	vec3 point_in_cam_frame = cam_rot * point_in_world_frame;\n"
 	"	vec3 point_in_cam_pic_uniform = cam_cal * math_to_opencv * point_in_cam_frame;\n"
 	"	vec2 point_in_cam_pic = point_in_cam_pic_uniform.xy / point_in_cam_pic_uniform.z;\n"
@@ -90,7 +88,6 @@ const char* drawOnCanvasFragmentSource =
 	"		float ymarg = min(  (min(point_in_cam_pic.y, CAM_YRES-point_in_cam_pic.y)/margin_thickness), 1.0);\n"
 	"		outColor.a=xmarg*ymarg;\n"
 	"	}\n"
-	//"		outColor = vec4(point_in_cam_pic/vec2(CAM_XRES,CAM_YRES),-point_in_cam_pic_uniform.z/1000,1);\n"
 	"	else\n"
 	"		outColor = vec4(0.0,0.0,0.0,0.00);"
 //	"	float xxx = Texcoord.x/3.141592654*180/10+100;"
@@ -114,17 +111,13 @@ const char* drawFromCanvasFragmentSource =
 	"out vec4 outColor;\n"
 	"void main()\n"
 	"{\n"
-	//"	vec3 point_in_eye_frame = opencv_to_math * eye_cal_inv * vec3( Texcoord.x,  Texcoord.y/aspect_ratio, 1 );\n"
 	"	vec3 point_in_eye_frame = opencv_to_math *  vec3( vec2(Texcoord.x-0.5, (Texcoord.y-0.5)/aspect_ratio) /CAM_FX  , 1);"
 	"	// eye_rot_inv rotates a pixel FROM eye TO world frame\n"
 	"	mat3 eye_rot_inv = transpose( transpose(mat3(1,0,0,  0,cos(eye_roll),sin(eye_roll), 0,-sin(eye_roll),cos(eye_roll))) * transpose(mat3(cos(eye_pitch),0,-sin(eye_pitch), 0,1,0, sin(eye_pitch),0,cos(eye_pitch))) * transpose(mat3(cos(eye_yaw),sin(eye_yaw),0,-sin(eye_yaw),cos(eye_yaw),0,0,0,1)) );\n"
 	"	vec3 point_in_world_frame = eye_rot_inv * point_in_eye_frame;\n"
 	"	float yaw = atan( point_in_world_frame.y , point_in_world_frame.x );\n"
 	"	float pitch = atan(-point_in_world_frame.z, sqrt(pow(point_in_world_frame.x,2)+pow(point_in_world_frame.y,2)));\n"
-	//"	outColor = vec4( 10*yaw/2/3.1415+0.5, 10*pitch/3.1415+0.5,0.5,1);\n"
 	"	outColor = texture(texVideo, vec2( yaw/2/3.141593654+0.5, pitch/3.141592654+0.5 ));\n"
-	//"	outColor = texture(texVideo, Texcoord);\n"
-	//"	outColor = vec4(Texcoord,0,1.0);\n"
 	"}\n";
 
 const char* oculusVertexSource =
@@ -143,22 +136,15 @@ const char* oculusFragmentSource =
 	"out vec4 outColor;\n"
 	"const vec2 LeftLensCenter = vec2(0, 0.);\n"
 	"const vec2 RightLensCenter = vec2(-0, 0.);\n"
-	//"const vec4 HmdWarpParam   = vec4(1, 0, 0, 0);\n"
 	"const vec4 HmdWarpParam   = vec4(1, 0.2, 0.1, 0)*0.78;\n"
-	//"const vec4 HmdWarpParam   = vec4(1, 0., 0., 0);\n"
 	"uniform float aberr_r;\n"
 	"uniform float aberr_b;\n"
-//	"const float aberr_r = 0.97;\n"
-//	"const float aberr_b = 1.03;\n"
-////	"const float aberr_r = 0.985;\n"
-////	"const float aberr_b = 1.015;\n"
 	"void main()\n"
 	"{\n"
 	"	vec2 LensCenter = Screencoord.x < 0 ? LeftLensCenter : RightLensCenter;\n"
 	"	float x = (Screencoord.x > 0? Screencoord.x : (Screencoord.x+1))*2 -1;\n" // between -1 and 1
 	"	float y = (Screencoord.y);\n"
 	"	vec2 theta = (vec2(x,y) - LensCenter);\n"
-//	"	theta=theta/2;\n"
 	"	float rSq = theta.x*theta.x+theta.y*theta.y;\n"
 	"	vec2 rvector = theta * (HmdWarpParam.x + HmdWarpParam.y * rSq +"
 	"		HmdWarpParam.z * rSq * rSq + HmdWarpParam.w * rSq * rSq * rSq);\n"
@@ -183,7 +169,7 @@ const char* oculusDummyFragmentSource =
 
 
 
-float vertices[] = {
+float drawOnCanvasVertices[] = {
 	-1.f,  1.f,  -PI,PI/2,  // Vertex 1 (X, Y)
 	 1.f,  1.f,  PI,PI/2,  // Vertex 2 (X, Y)
 	 1.f, -1.f, PI,-PI/2,  // Vertex 3 (X, Y)
@@ -193,7 +179,7 @@ float vertices[] = {
 	-1.f,  1.f,  -PI,PI/2  // Vertex 1 (X, Y)
 };
 
-float vertices2[] = {
+float drawOnEyeVertices[] = {
 	-1.f,  1.f,  1.f,0.f,  // Vertex 1 (X, Y)
 	 1.f,  1.f,  0.f,0.f,  // Vertex 2 (X, Y)
 	 1.f, -1.f,  0.f,1.f,  // Vertex 3 (X, Y)
@@ -439,7 +425,6 @@ float deadzone(float val, float dead)
 
 int main(int argc, const char** argv)
 {
-
 	GLFWwindow* window = initOpenGL();
 
 
@@ -455,10 +440,10 @@ int main(int argc, const char** argv)
 	glGenBuffers(1, &vboWholescreenQuad);
 
 	glBindBuffer(GL_ARRAY_BUFFER, vboCanvas);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(drawOnCanvasVertices), drawOnCanvasVertices, GL_STATIC_DRAW);
 
 	glBindBuffer(GL_ARRAY_BUFFER, vboEye);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(vertices2), vertices2, GL_STATIC_DRAW);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(drawOnEyeVertices), drawOnEyeVertices, GL_STATIC_DRAW);
 
 	glBindBuffer(GL_ARRAY_BUFFER, vboWholescreenQuad);
 	glBufferData(GL_ARRAY_BUFFER, sizeof(wholescreenVertices), wholescreenVertices, GL_STATIC_DRAW);
@@ -468,9 +453,9 @@ int main(int argc, const char** argv)
 
 	
 	// compile shaders
-	GLuint oculusShaderProgram = newOculusShaderProgram(vaoWholescreenQuad, vboWholescreenQuad);
-	GLint uniAberrR = glGetUniformLocation(oculusShaderProgram, "aberr_r");
-	GLint uniAberrB = glGetUniformLocation(oculusShaderProgram, "aberr_b");
+	GLuint drawOnOculusProgram = newOculusShaderProgram(vaoWholescreenQuad, vboWholescreenQuad);
+	GLint uniAberrR = glGetUniformLocation(drawOnOculusProgram, "aberr_r");
+	GLint uniAberrB = glGetUniformLocation(drawOnOculusProgram, "aberr_b");
 	
 	GLuint drawOnCanvasProgram = newCanvasShaderProgram(vaoCanvas, vboCanvas);
 	GLint uniCamYaw = glGetUniformLocation(drawOnCanvasProgram, "cam_yaw");
@@ -725,7 +710,7 @@ int main(int argc, const char** argv)
 		glBindFramebuffer(GL_FRAMEBUFFER, 0);
 		glViewport(0,0,SCREEN_WIDTH, SCREEN_HEIGHT);
 		glBindVertexArray(vaoWholescreenQuad);
-		glUseProgram(oculusShaderProgram);
+		glUseProgram(drawOnOculusProgram);
 		glUniform1f(uniAberrR, aberr_r);
 		glUniform1f(uniAberrB, aberr_b);
 		glActiveTexture(GL_TEXTURE0);
