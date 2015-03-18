@@ -705,8 +705,8 @@ int main(int argc, const char** argv)
 		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, frame_gl.size().width, frame_gl.size().height, 0, GL_RGB, GL_UNSIGNED_BYTE, frame_gl.ptr<unsigned char>(0));
 		}
 
-
-		setDrawOnCanvasRange((float)yaw_cam/180.*PI,-(float)pitch_cam/180.*PI,80./180.*PI,45/180.*PI);
+		
+		if(i!=0) setDrawOnCanvasRange((float)yaw_cam/180.*PI,-(float)pitch_cam/180.*PI,80./180.*PI,45/180.*PI);
 		glBindBuffer(GL_ARRAY_BUFFER, vboCanvas);
 		glBufferData(GL_ARRAY_BUFFER, sizeof(drawOnCanvasVertices), drawOnCanvasVertices, GL_DYNAMIC_DRAW);
 
