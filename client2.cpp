@@ -33,7 +33,7 @@ using namespace cv;
 #define SCREEN_WIDTH  (1920)
 #define SCREEN_HEIGHT (1080)
 #define EYE_WIDTH (SCREEN_WIDTH/2)
-#define EYE_HEIGHT SCREEN_HEIGHT
+#define EYE_HEIGHT (SCREEN_HEIGHT)
 #define EYE_XDEG 30
 
 
@@ -90,9 +90,10 @@ const char* drawOnCanvasFragmentSource =
 	"	}\n"
 	"	else\n"
 	"		outColor = vec4(0.0,0.0,0.0,0.00);"
-//	"	float xxx = Texcoord.x/3.141592654*180/10+100;"
-//	"	float yyy = Texcoord.y/3.141592654*180/10+100;"
-//	"	if ( (abs(xxx- int(xxx)) < 0.01) || (abs(yyy- int(yyy)) <.01)) outColor = vec4(1,1,1,1); else outColor = vec4(0,0,0,1);"
+	"	float xxx = Texcoord.x/3.141592654*180/10+100;"
+	"	float yyy = Texcoord.y/3.141592654*180/10+100;"
+	"	if ( (abs(xxx- int(xxx)) < 0.01) || (abs(yyy- int(yyy)) <.01)) outColor = vec4(1,1,1,1);"
+	//"	else outColor = vec4(0,0,0,1);"
 	"}\n";
 
 
@@ -168,16 +169,32 @@ const char* oculusDummyFragmentSource =
 	"}\n";
 
 
-
 float drawOnCanvasVertices[] = {
-	-1.f,  1.f,  -PI,PI/2,  // Vertex 1 (X, Y)
-	 1.f,  1.f,  PI,PI/2,  // Vertex 2 (X, Y)
-	 1.f, -1.f, PI,-PI/2,  // Vertex 3 (X, Y)
+	-1.f,  1.f,  -PI, PI/2,  // Vertex 1 (X, Y)
+	 1.f,  1.f,   PI, PI/2,  // Vertex 2 (X, Y)
+	 1.f, -1.f,   PI,-PI/2,  // Vertex 3 (X, Y)
 
-	 1.f, -1.f, PI,-PI/2,  // Vertex 3 (X, Y)
+	 1.f, -1.f,   PI,-PI/2,  // Vertex 3 (X, Y)
 	-1.f, -1.f,  -PI,-PI/2,  // Vertex 4 (X, Y)
-	-1.f,  1.f,  -PI,PI/2  // Vertex 1 (X, Y)
+	-1.f,  1.f,  -PI, PI/2  // Vertex 1 (X, Y)
 };
+
+void setDrawOnCanvasRange(float yaw, float pitch, float width, float height)
+{
+	drawOnCanvasVertices[2]=drawOnCanvasVertices[18]=drawOnCanvasVertices[22]=yaw-width/2;
+	drawOnCanvasVertices[6]=drawOnCanvasVertices[10]=drawOnCanvasVertices[14]=yaw+width/2;
+	drawOnCanvasVertices[3]=drawOnCanvasVertices[7]=drawOnCanvasVertices[23]=pitch+height/2;
+	drawOnCanvasVertices[11]=drawOnCanvasVertices[15]=drawOnCanvasVertices[19]=pitch-height/2;
+
+	for (int i=0; i<6; i++)
+	{
+		drawOnCanvasVertices[i*4+0] = drawOnCanvasVertices[i*4+2]/PI;
+		drawOnCanvasVertices[i*4+1] = drawOnCanvasVertices[i*4+3]/PI*2;
+	}
+}
+
+
+
 
 float drawOnEyeVertices[] = {
 	-1.f,  1.f,  1.f,0.f,  // Vertex 1 (X, Y)
@@ -460,7 +477,7 @@ int main(int argc, const char** argv)
 	glGenBuffers(1, &vboWholescreenQuad);
 
 	glBindBuffer(GL_ARRAY_BUFFER, vboCanvas);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(drawOnCanvasVertices), drawOnCanvasVertices, GL_STATIC_DRAW);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(drawOnCanvasVertices), drawOnCanvasVertices, GL_DYNAMIC_DRAW);
 
 	glBindBuffer(GL_ARRAY_BUFFER, vboEye);
 	glBufferData(GL_ARRAY_BUFFER, sizeof(drawOnEyeVertices), drawOnEyeVertices, GL_STATIC_DRAW);
@@ -573,11 +590,15 @@ int main(int argc, const char** argv)
 	char key;
 	int adjust_phi=10;
 	float aberr_r=0.989, aberr_b=1.021;
-	while ((key=waitKey(1)) != 'e')
+	int i=-1;
+	while (key=' ')
+	//while ((key=waitKey(1)) != 'e')
 	{
-		printf("\033[H");
+		i++;
+		//printf("\033[H");
 
-
+		if (i%10==0)
+		{
 		drone.get(frame_, &navdata);
 		delay_phi.put(navdata.phi);
 		delay_psi.put(navdata.psi);
@@ -596,13 +617,15 @@ int main(int argc, const char** argv)
 		if (key=='s') aberr_b+=0.001;
 		if (key=='x') aberr_b-=0.001;
 
-		printf("aberr_r/b = \t%f\t%f\n",aberr_r,aberr_b);
+		//printf("aberr_r/b = \t%f\t%f\n",aberr_r,aberr_b);
 		
 		//for (int i=0; i<1280; i+=50) frame_.col(i)=Scalar(0,255,255);
 		//for (int i=0; i<720; i+=50) frame_.row(i)=Scalar(0,255,255);
 
 		remap(frame_, frame, map1, map2, INTER_LINEAR);
 		cvtColor(frame, gray, COLOR_BGR2GRAY);
+		}
+		
 
 
 
@@ -675,10 +698,17 @@ int main(int argc, const char** argv)
 
 
 
+		if (i%1==0)
+		{
 		glBindTexture(GL_TEXTURE_2D, texVideo);
 		Mat frame_gl = frame.clone();
 		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, frame_gl.size().width, frame_gl.size().height, 0, GL_RGB, GL_UNSIGNED_BYTE, frame_gl.ptr<unsigned char>(0));
+		}
 
+
+		setDrawOnCanvasRange((float)yaw_cam/180.*PI,-(float)pitch_cam/180.*PI,80./180.*PI,45/180.*PI);
+		glBindBuffer(GL_ARRAY_BUFFER, vboCanvas);
+		glBufferData(GL_ARRAY_BUFFER, sizeof(drawOnCanvasVertices), drawOnCanvasVertices, GL_DYNAMIC_DRAW);
 
 
 		glBindFramebuffer(GL_FRAMEBUFFER, canvasFB);

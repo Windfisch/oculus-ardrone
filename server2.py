@@ -50,8 +50,8 @@ while True:
                     batt = 100.0
 
                     framestr = frame.tostring()
-                    cv2.imshow("server", frame)
-                    cv2.waitKey(1)
+                    #cv2.imshow("server", frame)
+                    #cv2.waitKey(1)
                     lenframestr=len(framestr)
                     connection.sendall(struct.pack(">i",lenframestr)+framestr+struct.pack("@dddd", phi, theta, psi, batt));
                 elif data[0:3] == "fly" and data[-1]=="\n":
