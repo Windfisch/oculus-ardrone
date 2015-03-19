@@ -201,7 +201,31 @@ const char* oculusDummyFragmentSource =
 	"}\n";
 
 
+float fixup_range(float a, float low, float upp)
+{
+	float tot=upp-low;
+	while (a < low) a+=tot;
+	while (a>= upp) a-=tot;
+	return a;
+}
+
+float fixup_angle(float a)
+{
+	return fixup_range(a,-180,180);
+}
+
+
 float drawOnCanvasVertices[] = {
+// First rectangle
+	-1.f,  1.f,  -PI, PI/2,  // Vertex 1 (X, Y)
+	 1.f,  1.f,   PI, PI/2,  // Vertex 2 (X, Y)
+	 1.f, -1.f,   PI,-PI/2,  // Vertex 3 (X, Y)
+
+	 1.f, -1.f,   PI,-PI/2,  // Vertex 3 (X, Y)
+	-1.f, -1.f,  -PI,-PI/2,  // Vertex 4 (X, Y)
+	-1.f,  1.f,  -PI, PI/2  // Vertex 1 (X, Y)
+
+// Second rectangle
 	-1.f,  1.f,  -PI, PI/2,  // Vertex 1 (X, Y)
 	 1.f,  1.f,   PI, PI/2,  // Vertex 2 (X, Y)
 	 1.f, -1.f,   PI,-PI/2,  // Vertex 3 (X, Y)
@@ -211,20 +235,47 @@ float drawOnCanvasVertices[] = {
 	-1.f,  1.f,  -PI, PI/2  // Vertex 1 (X, Y)
 };
 
-void setDrawOnCanvasRange(float yaw, float pitch, float width, float height)
+// fills a (single) rectangle like in drawOnCanvasVertices, but going from yaw1/pitch1 to yaw2/pitch2.
+// yaw1 < yaw2, pitch1 < pitch2
+void setDrawOnCanvasRangeHelper(float* array, float yaw1, float yaw2, float pitch1, float pitch2)
 {
-	drawOnCanvasVertices[2]=drawOnCanvasVertices[18]=drawOnCanvasVertices[22]=yaw-width/2;
-	drawOnCanvasVertices[6]=drawOnCanvasVertices[10]=drawOnCanvasVertices[14]=yaw+width/2;
-	drawOnCanvasVertices[3]=drawOnCanvasVertices[7]=drawOnCanvasVertices[23]=pitch+height/2;
-	drawOnCanvasVertices[11]=drawOnCanvasVertices[15]=drawOnCanvasVertices[19]=pitch-height/2;
+	array[2]=array[18]=array[22]=yaw1;
+	array[6]=array[10]=array[14]=yaw2;
+	array[3]=array[7]=array[23]=pitch2;
+	array[11]=array[15]=array[19]=pitch1;
 
 	for (int i=0; i<6; i++)
 	{
-		drawOnCanvasVertices[i*4+0] = drawOnCanvasVertices[i*4+2]/PI;
-		drawOnCanvasVertices[i*4+1] = drawOnCanvasVertices[i*4+3]/PI*2;
+		array[i*4+0] = array[i*4+2]/PI;
+		array[i*4+1] = array[i*4+3]/PI*2;
 	}
 }
 
+// returns the number of vectors generated (i.e. 6 or 12)
+int setDrawOnCanvasRange(float yaw, float pitch, float width, float height)
+{
+	float yaw1 = yaw-width/2;
+	float yaw2 = yaw+width/2;
+	float pitch1 = pitch-height/2;
+	float pitch2 = pitch+height/2;
+	
+	yaw1 = fixup_range(yaw1, -PI, PI);
+	yaw2 = fixup_range(yaw2, -PI, PI);
+	if (pitch1 < -PI/2) pitch1 = -PI/2;
+	if (pitch2 >  PI/2) pitch2 =  PI/2;
+
+	if (yaw1 <= yaw2)
+	{
+		setDrawOnCanvasRangeHelper(drawOnCanvasVertices, yaw1, yaw2, pitch1, pitch2);
+		return 6;
+	}
+	else
+	{
+		setDrawOnCanvasRangeHelper(drawOnCanvasVertices,    -PI, yaw1, pitch1, pitch2);
+		setDrawOnCanvasRangeHelper(drawOnCanvasVertices+24, yaw2, +PI, pitch1, pitch2);
+		return 12;
+	}
+}
 
 
 
@@ -370,19 +421,6 @@ GLFWwindow* initOpenGL()
 
 
 const int width = 1280, height = 720;
-
-float fixup_range(float a, float low, float upp)
-{
-	float tot=upp-low;
-	while (a < low) a+=tot;
-	while (a>= upp) a-=tot;
-	return a;
-}
-
-float fixup_angle(float a)
-{
-	return fixup_range(a,-180,180);
-}
 
 void calc_undistort_maps(float px_per_deg, int width, int height, Mat& map1, Mat& map2)
 {
@@ -782,10 +820,13 @@ int main(int argc, const char** argv)
 		glBindTexture(GL_TEXTURE_2D, texVideo);
 		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, frame_gl.size().width, frame_gl.size().height, 0, GL_RGB, GL_UNSIGNED_BYTE, frame_gl.ptr<unsigned char>(0));
 
-		
-		if(i!=0) setDrawOnCanvasRange((float)yaw_cam/180.*PI,-(float)pitch_cam/180.*PI,80./180.*PI,45/180.*PI);
+		int n_vert;
+		if (i!=0)
+			n_vert = setDrawOnCanvasRange((float)yaw_cam/180.*PI,-(float)pitch_cam/180.*PI,80./180.*PI,45/180.*PI);
+		else
+			n_vert = 6;
 		glBindBuffer(GL_ARRAY_BUFFER, vboCanvas);
-		glBufferData(GL_ARRAY_BUFFER, sizeof(drawOnCanvasVertices), drawOnCanvasVertices, GL_DYNAMIC_DRAW);
+		glBufferData(GL_ARRAY_BUFFER, n_vert * 4*sizeof(*drawOnCanvasVertices), drawOnCanvasVertices, GL_DYNAMIC_DRAW);
 
 
 		glBindFramebuffer(GL_FRAMEBUFFER, canvasFB);
@@ -797,7 +838,7 @@ int main(int argc, const char** argv)
 		glUniform1f(uniCamYaw,(float)yaw_cam/180.*PI);
 		glUniform1f(uniCamPitch,-(float)pitch_cam/180.*PI);
 		glUniform1f(uniCamRoll,-roll_cam/180.*PI);
-		glDrawArrays(GL_TRIANGLES, 0, 6);
+		glDrawArrays(GL_TRIANGLES, 0, n_vert);
 
 
 
