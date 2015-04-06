@@ -136,7 +136,7 @@ const char* drawFromCanvasFragmentSource =
 	"uniform float eye_pitch;\n"
 	"uniform float eye_roll;\n"
 	"const float aspect_ratio=1280./2/720.;\n"
-	"const float horiz_field_of_view=60/180.*3.141592654;\n"
+	"const float horiz_field_of_view=90/180.*3.141592654;\n"
 	"const float CAM_FX=1/2.0 / tan(horiz_field_of_view/2.0);\n"
 	"const mat3 eye_cal_inv = transpose(mat3(1/CAM_FX, 0, -1/2/CAM_FX,    0, 1/CAM_FX, -1/aspect_ratio/2/CAM_FX,     0,0,1));\n"
 	"const mat3 opencv_to_math = mat3(0,1,0,   0,0,1,   -1,0,0);\n"
@@ -657,8 +657,8 @@ void* video_fetcher_thread(void* ptr)
 		pitch_diff = deadzone(pitch_diff, 1.0);
 		roll_diff = deadzone(roll_diff, 1.0);
 
-		yaw_diff*=0.1;
-		pitch_diff*=0.1;
+		yaw_diff*=0.3;
+		pitch_diff*=0.3;
 		roll_diff*=0.5;
 		yaw_cam = fixup_range(yaw_cam - yaw_diff, -180, 180);
 		pitch_cam = pitch_cam - pitch_diff;

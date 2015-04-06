@@ -29,6 +29,24 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
+# keyboard:
+# 1: enable xy control
+# 2: enable z control
+# 3: enable rot control
+# a: fast
+# z: slow
+# t: trim
+# 
+# 
+# joystick:
+# thumb: land
+# all four thumbbuttons: reset
+# left shoulder + right shoulder + 11: takeoff
+# 11: readjust
+# left shoulder: relative flight mode if held
+# right shoulder: float, do not hover, if held.
+
+
 import libardrone.libardrone as libardrone
 import pygame
 import cv2
@@ -80,6 +98,7 @@ class ServerThread(threading.Thread):
                             global_cmd_rot = float(values[3])
                             global_cmd_hover =  False # TODO XXX
                             lock.release()
+                            print >>sys.stderr, "fly x/y/z/r/hov=",global_cmd_x,",",global_cmd_y,",","global_cmd_z",",",global_cmd_rot,",",global_cmd_hover
                     else:
                         print >>sys.stderr, 'no more data from', client_address
                         break
