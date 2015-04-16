@@ -185,11 +185,12 @@ while True:
     if no_flight == False:
         pygame.event.pump()
 
-        btn_leftshoulder =  js.get_button(4) or js.get_button(6)
-        btn_rightshoulder = js.get_button(5) or js.get_button(7)
+        btn_leftshoulder =  js.get_button(4) or js.get_button(5)
+        btn_rightshoulder = js.get_button(6) or js.get_button(7)
         btn_thumb = js.get_button(0) or js.get_button(1) or js.get_button(2) or js.get_button(3)
         btn_all = js.get_button(0) and js.get_button(1) and js.get_button(2) and js.get_button(3)
-        btn_readjust = js.get_button(10)
+        btn_readjust = js.get_button(8)
+        btn_unlock = js.get_button(9)
 
         if btn_thumb:
             drone.land()
@@ -197,7 +198,7 @@ while True:
             manual_override_xy = True
             manual_override_z = True
             manual_override_rot = True
-        if btn_leftshoulder and btn_rightshoulder and js.get_button(10):
+        if btn_leftshoulder and btn_rightshoulder and js.get_button(8):
             drone.takeoff()
             print "taking off"
             manual_override_xy = True
@@ -211,6 +212,8 @@ while True:
             manual_override_rot = True
         if btn_readjust:
             js_angle_shift = drone.navdata.get(0, dict()).get('psi',0)
+        if btn_unlock:
+            manual_override_rot = False
 
         rel_angle = (drone.navdata.get(0, dict()).get('psi',0) - js_angle_shift)/180.*math.pi
 
