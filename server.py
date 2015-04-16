@@ -61,6 +61,13 @@ from math import sin,cos,tan
 
 OVERRIDE_THRESHOLD=0.01
 
+global_cmd_x = 0
+global_cmd_y = 0
+global_cmd_z = 0
+global_cmd_rot = 0
+global_cmd_hover =  False # TODO XXX
+
+
 def putStatusText(img, text, pos, activated):
     cv2.putText(img, text, pos, cv2.FONT_HERSHEY_PLAIN, 1, (0,0,255) if activated else (127,127,127), 2 if activated else 1)
 
@@ -72,16 +79,24 @@ def encode_int(i):
 
 class ServerThread(threading.Thread):
     def run(self):
+
+        global global_cmd_x
+        global global_cmd_y
+        global global_cmd_z
+        global global_cmd_rot
+        global global_cmd_hover
+
         while True:
             # Wait for a connection
             print >>sys.stderr, 'waiting for a connection'
             connection, client_address = sock.accept()
+            conn2=connection.makefile()
             #try:
             if True:
                 print >>sys.stderr, 'connection from', client_address
 
                 while True:
-                    data = connection.recv(16)
+                    data = conn2.readline()
                     if data:
                         if data=="get\n":
                             lock.acquire()
@@ -99,6 +114,8 @@ class ServerThread(threading.Thread):
                             global_cmd_hover =  False # TODO XXX
                             lock.release()
                             print >>sys.stderr, "fly x/y/z/r/hov=",global_cmd_x,",",global_cmd_y,",","global_cmd_z",",",global_cmd_rot,",",global_cmd_hover
+                        else:
+                            print >>sys.stderr, "got corrupted command: '"+data+"'"
                     else:
                         print >>sys.stderr, 'no more data from', client_address
                         break
@@ -144,12 +161,6 @@ except:
 manual_override_xy = True
 manual_override_z = True
 manual_override_rot = True
-
-global_cmd_x = 0
-global_cmd_y = 0
-global_cmd_z = 0
-global_cmd_rot = 0
-global_cmd_hover =  False # TODO XXX
 
 drone = libardrone.ARDrone(True, True)
 drone.reset()
@@ -231,6 +242,7 @@ while True:
             actual_rot = js_rot
         else:
             actual_rot = global_cmd_rot
+            print "global_cmd_rot used, was",global_cmd_rot
 
         drone.move_freely( not actual_hover  , actual_x, actual_y, actual_z, actual_rot) 
     

@@ -528,6 +528,19 @@ float deadzone(float val, float dead)
 	return val;
 }
 
+float saturate(float val, float sat)
+{
+	if (val < 0.)
+	{
+		if (val < -sat) val = -sat;
+	}
+	else
+	{
+		if (val > sat) val = sat;
+	}
+	return val;
+}
+
 
 pthread_mutex_t my_mutex;
 sem_t oculus_thread_go;
@@ -535,6 +548,7 @@ sem_t oculus_thread_go;
 ModuloRingbuffer ringbuf_yaw_sensor_slow(40, -180,180);
 ModuloRingbuffer ringbuf_pitch_sensor_slow(40, -180,180);
 float yaw_cam_global, pitch_cam_global, roll_cam_global;
+float oculus_yaw_global;
 Mat frame_global;
 
 void* video_fetcher_thread(void* ptr)
@@ -553,7 +567,7 @@ void* video_fetcher_thread(void* ptr)
 	Ringbuffer delay_psi(DELAY_SIZE);   // that's the amount the video lags behind
 	Ringbuffer delay_theta(DELAY_SIZE); // the sensor data
 	
-	int adjust_phi=10;
+	int adjust_phi=0;//10;
 	
 	
 	DroneConnection drone(SOCKETPATH);
@@ -680,7 +694,15 @@ void* video_fetcher_thread(void* ptr)
 
 		ringbuf_yaw_sensor_slow.put(navdata.psi);
 		ringbuf_pitch_sensor_slow.put(navdata.theta);
+
+		float oculus_yaw = oculus_yaw_global;
 		pthread_mutex_unlock(&my_mutex);
+
+		float yawdiff = fixup_angle((oculus_yaw-PI)*180./PI - yaw_cam);
+		float rotate = saturate(yawdiff/45., 1.);
+		drone.fly(0.,0.,0.,rotate);
+		
+
 
 		if (first_time)
 		{
@@ -868,6 +890,10 @@ int main(int argc, const char** argv)
 			oculus_pitch = ringbuf_pitch_sensor_slow.get()/180.*PI;
 			oculus_roll = 0.1;
 		}
+		
+		pthread_mutex_lock(&my_mutex);
+		oculus_yaw_global = oculus_yaw;
+		pthread_mutex_unlock(&my_mutex);
 
 
 		glBindFramebuffer(GL_FRAMEBUFFER, eyeFB);

@@ -62,13 +62,14 @@ while True:
     # Wait for a connection
     print >>sys.stderr, 'waiting for a connection'
     connection, client_address = sock.accept()
+    conn2 = connection.makefile()
     try:
         print >>sys.stderr, 'connection from', client_address
         
         cap = cv2.VideoCapture("flight.avi")
         logfile = open("flight.log", "r")
         while True:
-            data = connection.recv(16)
+            data = conn2.readline()
             if data:
                 if data=="get\n":
                     status, frame = cap.read()
@@ -86,6 +87,8 @@ while True:
                 elif data[0:3] == "fly" and data[-1]=="\n":
                     values = data[3:-1].split()
                     print "fly ",values
+                else:
+                    print "corrupted command: '"+data+"'"
             else:
                 print >>sys.stderr, 'no more data from', client_address
                 break

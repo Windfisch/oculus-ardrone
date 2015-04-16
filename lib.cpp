@@ -96,3 +96,17 @@ void DroneConnection::get(Mat& frame, navdata_t* nav)
 
 	frame = Mat(720,1280,CV_8UC3, buffer);
 }
+
+void DroneConnection::fly(float x, float y, float z, float rot)
+{
+	char buf[100];
+	int len = snprintf(buf, sizeof(buf), "fly %f %f %f %f\n", x,y,z,rot);
+	if (len >= sizeof(buf)-1)
+	{
+		printf("ERROR: buffer too small in DroneConnection::fly()!\n");
+		return;
+	}
+	printf("%s\n",buf);
+
+	write(sockfd, buf, len);
+}

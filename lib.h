@@ -48,6 +48,7 @@ class DroneConnection
 		DroneConnection(const char* sockpath);
 		~DroneConnection();
 		void get(cv::Mat& frame, navdata_t* navdata);
+		void fly(float x, float y, float z, float rot);
 	
 	private:
 		unsigned char* buffer;
