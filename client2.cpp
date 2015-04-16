@@ -817,6 +817,7 @@ int main(int argc, const char** argv)
 
 	char key;
 	float aberr_r=0.989, aberr_b=1.021;
+	float yaw_plus=0.0;
 	int i=-1;
 	while (key=' ')
 	//while ((key=waitKey(1)) != 'e')
@@ -883,6 +884,8 @@ int main(int argc, const char** argv)
 			oculus_pitch = asin(2.0*(quat[0]*quat[2]-quat[1]*quat[3]));
 			oculus_roll = -atan2(2.0*(quat[2]*quat[3]+quat[0]*quat[1]), -(quat[0]*quat[0]-quat[1]*quat[1]-quat[2]*quat[2]+quat[3]*quat[3]));
 
+			oculus_yaw = fixup_range(oculus_yaw+yaw_plus, -PI, PI);
+
 			//printf("oculus yaw, pitch, roll = \t%f\t%f\t%f\n", oculus_yaw*180/PI, oculus_pitch*180/PI, oculus_roll*180/PI);
 		}
 		else
@@ -928,6 +931,10 @@ int main(int argc, const char** argv)
 
 		if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
 			glfwSetWindowShouldClose(window, GL_TRUE);
+		if (glfwGetKey(window, GLFW_KEY_ENTER) == GLFW_PRESS)
+		{
+			yaw_plus = PI+yaw_cam/180.*PI+yaw_plus-oculus_yaw;
+		}
 
 		showFPS();
 
