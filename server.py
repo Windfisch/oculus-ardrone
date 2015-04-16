@@ -291,6 +291,7 @@ while True:
     
     if key == ord("1"):
         manual_override_xy = False
+        print "yoooo"
     elif key == ord("2"):
         manual_override_z = False
     elif key == ord("3"):

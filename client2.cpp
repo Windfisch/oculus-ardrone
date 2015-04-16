@@ -602,6 +602,7 @@ void* video_fetcher_thread(void* ptr)
 		delay_phi.put(navdata.phi);
 		delay_psi.put(navdata.psi);
 		delay_theta.put(navdata.theta);
+		printf("%lf\n",navdata.batt);
 		navdata.phi = delay_phi.front();
 		navdata.psi = delay_psi.front();
 		navdata.theta = delay_theta.front();
