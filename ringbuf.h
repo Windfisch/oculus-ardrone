@@ -41,8 +41,8 @@ class Ringbuffer
 		buf = new double[size];
 		for (int i=0; i<size; i++)
 			buf[i] = 0;
-		avg = 0.0;
-		avg_valid = false;
+		sum_ = 0.0;
+		sum_valid = false;
 	}
 
 	~Ringbuffer()
@@ -50,18 +50,22 @@ class Ringbuffer
 		delete [] buf;
 	}
 
-	double get()
+	double sum()
 	{
-		if (!avg_valid)
+		if (!sum_valid)
 		{
-			avg=0.0;
+			sum_=0.0;
 			for (int i=0; i<size; i++)
-				avg += buf[i];
-			avg/=size;
-			avg_valid=true;
+				sum_ += buf[i];
+			sum_valid=true;
 		}
 
-		return avg;
+		return sum_;
+	}
+	
+	double get()
+	{
+		return sum()/size;
 	}
 	
 	double front()
@@ -73,30 +77,30 @@ class Ringbuffer
 	{
 		buf[idx] = val;
 		idx = (idx+1) % size;
-		avg_valid = false;
+		sum_valid = false;
 	}
 
 	void set(double val)
 	{
 		for (int i=0; i<size; i++)
 			buf[i]=val;
-		avg = val;
-		avg_valid=true;
+		sum_ = size*val;
+		sum_valid=true;
 	}
 
 	void add(double val)
 	{
 		for (int i=0; i<size; i++)
 			buf[i]+=val;
-		avg += val;
+		sum_ += size*val;
 	}
 
 	private:
 		double* buf;
 		int idx;
 		int size;
-		double avg;
-		bool avg_valid;
+		double sum_;
+		bool sum_valid;
 };
 
 class ModuloRingbuffer

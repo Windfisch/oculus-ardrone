@@ -1,5 +1,7 @@
 client2: client2.cpp lib.cpp ringbuf.h contrib/OpenHMD/src/.libs/libopenhmd.a
 	g++ -std=c++11 -g client2.cpp lib.cpp -lglfw -lGLEW -lGLU -lGL `pkg-config --libs opencv` -lm -DOHMD_STATIC -Icontrib/OpenHMD/include/ contrib/OpenHMD/src/.libs/libopenhmd.a -lhidapi-libusb -lrt -lpthread -o client2
+regulator_test: regulator_test.cpp
+	g++ -std=c++11 -g regulator_test.cpp `pkg-config --libs opencv` -lm -o regulator_test
 client: client.c
 	gcc client.c -lX11 -lXi -lXmu -lglut -lGL -lGLU -lm  -o client
 
