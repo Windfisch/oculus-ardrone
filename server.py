@@ -181,6 +181,14 @@ global_batt = 0.
 global_frame =  None
 
 serverthread.start()
+
+drone.set_max_vz(750.0000)
+drone.set_max_rotspeed(1.0)
+drone.set_max_angle(0.1)
+limit_vz=750.0
+limit_rot=1.0
+limit_tilt=0.1
+
 while True:
     if no_flight == False:
         pygame.event.pump()
@@ -234,18 +242,21 @@ while True:
         if manual_override_xy:
             actual_hover, actual_x, actual_y = js_hover, js_x, js_y
         else:
-            actual_hover, actual_x, actual_y = global_cmd_hover, global_cmd_x, global_cmd_y
+            actual_hover, actual_x, actual_y = global_cmd_hover, global_cmd_x/limit_tilt, global_cmd_y/limit_tilt
+            actual_x=max(-1.0, min(1.0, actual_x))
+            actual_y=max(-1.0, min(1.0, actual_y))
 
         if manual_override_z:
             actual_z = js_z
         else:
-            actual_z = global_cmd_z
+            actual_z = global_cmd_z / limit_vz
+            actual_z=max(-1.0, min(1.0, actual_z))
 
         if manual_override_rot:
             actual_rot = js_rot
         else:
-            actual_rot = global_cmd_rot
-            print "global_cmd_rot used, was",global_cmd_rot
+            actual_rot = global_cmd_rot / limit_rot
+            actual_rot=max(-1.0, min(1.0, actual_rot))
 
         drone.move_freely( not actual_hover  , actual_x, actual_y, actual_z, actual_rot) 
     
@@ -283,13 +294,19 @@ while True:
 
     if key == ord("z"):
         drone.set_max_vz(750.0000)
-        drone.set_max_rotspeed(1.0)
-        drone.set_max_angle(0.1)
+        drone.set_max_rotspeed(10)
+        drone.set_max_angle(0.2)
+        limit_vz=750.0
+        limit_rot=10.
+        limit_tilt=0.2
         print "slow"
     elif key == ord("a"):
         drone.set_max_vz(10000.0000)
         drone.set_max_rotspeed(10)
         drone.set_max_angle(0.6)
+        limit_vz=10000.0
+        limit_rot=10.
+        limit_tilt=0.6
         print "fast"
     
     if key == ord("1"):

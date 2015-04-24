@@ -495,6 +495,28 @@ int init_ohmd(ohmd_context** ctx_, ohmd_device** hmd_)
 	return 0;
 }
 
+int getDroneFPS()
+{
+	static time_t last = 0;
+	static int nbFrames = 0;
+	static int fps=0;
+
+     // Measure speed
+     	time_t now = time(NULL);
+
+
+     nbFrames++;
+     if ( now - last > 0 ){ // more than 1 sec ago
+	fps = (nbFrames);
+         nbFrames = 0;
+         last = now;
+
+     if (fps<=0) fps = 1;
+     }
+
+	return fps;
+}
+
 void showFPS()
 {
 	static double lastTime = 0;
@@ -550,6 +572,7 @@ ModuloRingbuffer ringbuf_pitch_sensor_slow(40, -180,180);
 float yaw_cam_global, pitch_cam_global, roll_cam_global;
 float oculus_yaw_global;
 Mat frame_global;
+bool no_oculus;
 
 void* video_fetcher_thread(void* ptr)
 {
@@ -567,6 +590,15 @@ void* video_fetcher_thread(void* ptr)
 	Ringbuffer delay_psi(DELAY_SIZE);   // that's the amount the video lags behind
 	Ringbuffer delay_theta(DELAY_SIZE); // the sensor data
 	
+	#define CMDLAG_SIZE 8
+	// 5: still overshoots but much more stable
+	// 7: overshoots a tiny bit
+	// 8: cool!
+	// 9: pretty accurate, oscillates a tiny bit
+	// 10: slows down before hitting the goal, oscillates a tiny bit
+	Ringbuffer pending_commands(CMDLAG_SIZE); // holds all commands that will be executed
+	                                          // by the drone, but have not been sensed
+	                                          // yet (because of laggy sensors)
 	int adjust_phi=0;//10;
 	
 	
@@ -699,10 +731,14 @@ void* video_fetcher_thread(void* ptr)
 		float oculus_yaw = oculus_yaw_global;
 		pthread_mutex_unlock(&my_mutex);
 
-		float yawdiff = fixup_angle((oculus_yaw-PI)*180./PI - yaw_cam);
-		float rotate = saturate(yawdiff/45., 1.);
+		float target_yaw = no_oculus ? 0. : (oculus_yaw-PI);
+		int droneFPS = getDroneFPS();
+		printf("drone fps is %i\n",droneFPS);
+		float extrapolated_yaw_cam = yaw_cam*PI/180. + pending_commands.sum()*(1.0/droneFPS);
+		float yawdiff = fixup_angle(target_yaw - extrapolated_yaw_cam);
+		float rotate = saturate(yawdiff*5., 10.);
 		drone.fly(0.,0.,0.,rotate);
-		
+		pending_commands.put(rotate);
 
 
 		if (first_time)
@@ -720,7 +756,7 @@ void* video_fetcher_thread(void* ptr)
 
 int main(int argc, const char** argv)
 {
-	bool no_oculus = (argc>=2 && (strcmp(argv[1],"--no-oculus")==0));
+	no_oculus = (argc>=2 && (strcmp(argv[1],"--no-oculus")==0));
 
 	pthread_mutex_init(&my_mutex, NULL);
 	sem_init(&oculus_thread_go, 0, 0);
