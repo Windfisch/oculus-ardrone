@@ -42,8 +42,8 @@ float fixup_range(float a, float low, float upp)
 int main()
 {
 	Mat visu;
-	namedWindow("ficken");
-	setMouseCallback("ficken", onMouse);
+	namedWindow("dingens");
+	setMouseCallback("dingens", onMouse);
 	int time_msec=0;
 	float winkel_ist=0;
 	Regulator regulator(1.0,0.0,1,0.0);
@@ -67,7 +67,7 @@ int main()
 		
 		draw_angle(visu, winkel_ist, Scalar(0,0,255));
 		
-		imshow("ficken", visu);
+		imshow("dingens", visu);
 
 		time_msec+=10;
 	}
