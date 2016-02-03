@@ -136,7 +136,7 @@ const char* drawFromCanvasFragmentSource =
 	"uniform float eye_pitch;\n"
 	"uniform float eye_roll;\n"
 	"const float aspect_ratio=1280./2/720.;\n"
-	"const float horiz_field_of_view=90/180.*3.141592654;\n"
+	"const float horiz_field_of_view=50/180.*3.141592654;\n"
 	"const float CAM_FX=1/2.0 / tan(horiz_field_of_view/2.0);\n"
 	"const mat3 eye_cal_inv = transpose(mat3(1/CAM_FX, 0, -1/2/CAM_FX,    0, 1/CAM_FX, -1/aspect_ratio/2/CAM_FX,     0,0,1));\n"
 	"const mat3 opencv_to_math = mat3(0,1,0,   0,0,1,   -1,0,0);\n"
@@ -590,7 +590,7 @@ void* video_fetcher_thread(void* ptr)
 	Ringbuffer delay_psi(DELAY_SIZE);   // that's the amount the video lags behind
 	Ringbuffer delay_theta(DELAY_SIZE); // the sensor data
 	
-	#define CMDLAG_SIZE 8
+	#define CMDLAG_SIZE 6
 	// 5: still overshoots but much more stable
 	// 7: overshoots a tiny bit
 	// 8: cool!
@@ -736,7 +736,9 @@ void* video_fetcher_thread(void* ptr)
 		printf("drone fps is %i\n",droneFPS);
 		float extrapolated_yaw_cam = yaw_cam*PI/180. + pending_commands.sum()*(1.0/droneFPS);
 		float yawdiff = fixup_angle(target_yaw - extrapolated_yaw_cam);
-		float rotate = saturate(yawdiff*5., 10.);
+		yawdiff = deadzone(yawdiff, 5.*PI/180.);
+		float rotate = saturate( (yawdiff*5.)*fabs(yawdiff*5.) , 4.);
+		//float rotate = saturate(yawdiff*5., 4.);
 		drone.fly(0.,0.,0.,rotate);
 		pending_commands.put(rotate);
 
